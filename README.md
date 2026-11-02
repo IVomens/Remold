@@ -1,4 +1,4 @@
-<p align="center"><img src="common/src/main/resources/remold.png" width="128" alt="Remold logo"></p>
+<p align="center"><img src="docs/images/banner.png" alt="Remold: add, change and remove crafting recipes from in-game menus"></p>
 
 # Remold
 
@@ -9,6 +9,13 @@ Open your inventory as an operator, click the crafting-table button, drop items 
 press **Save**. That's it.
 
 *Minecraft 1.21.1 · NeoForge and Fabric · works alongside JEI, EMI and REI*
+
+## Highlights
+
+<p align="center"><img src="docs/images/feature-mod-machines.png" alt="Mod machines: edit any mod's machine recipes too, with no per-mod code needed"></p>
+<p align="center"><img src="docs/images/feature-unification.png" alt="One-click unification: pick your preferred copper ingot, and every mod's recipes use it"></p>
+<p align="center"><img src="docs/images/feature-progression.png" alt="Catch broken progression: warns you about uncraftable items and dupe loops before you save"></p>
+<p align="center"><img src="docs/images/feature-no-lock-in.png" alt="No lock-in: plain datapack output. Uninstall Remold and your recipes still work"></p>
 
 ---
 
