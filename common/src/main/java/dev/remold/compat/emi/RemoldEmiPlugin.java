@@ -84,6 +84,19 @@ public class RemoldEmiPlugin implements EmiPlugin {
             }
         });
 
+        // Padlock on locked recipes (recipe gating).
+        registry.addRecipeDecorator((recipe, widgets) -> {
+            var backing = recipe.getBackingRecipe();
+            var id = backing != null ? backing.id() : recipe.getId();
+            if (id == null) return;
+            String requirement = ClientState.gate(id);
+            if (requirement == null) return;
+            boolean locked = !ClientState.isUnlocked(requirement);
+            int x = widgets.getWidth() - 10;
+            widgets.addDrawable(x, 0, 9, 10, (g, mouseX, mouseY, delta) -> dev.remold.client.widget.UiDraw.padlock(g, 0, 0, locked));
+            widgets.addTooltipText(dev.remold.client.RemoldClient.lockTooltip(id), x, 0, 9, 10);
+        });
+
         registry.removeEmiStacks(stack -> {
             ItemStack item = stack.getItemStack();
             if (item.isEmpty()) return false;

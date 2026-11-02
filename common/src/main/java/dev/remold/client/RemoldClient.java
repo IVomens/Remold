@@ -23,6 +23,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -71,6 +72,35 @@ public final class RemoldClient {
         if (Minecraft.getInstance().screen instanceof EditorScreen editor) {
             editor.onTemplateReceived(payload.id());
         }
+    }
+
+    public static void handle(Payloads.SyncGates payload) {
+        ClientState.setGates(payload.gates(), payload.unlocked());
+    }
+
+    /** Tooltip lines for a recipe's lock, or an empty list if it isn't locked. */
+    public static List<Component> lockTooltip(ResourceLocation recipe) {
+        String requirement = ClientState.gate(recipe);
+        if (requirement == null) return List.of();
+        boolean met = ClientState.isUnlocked(requirement);
+        return List.of(dev.remold.RemoldText.tr(met ? "gate.unlocked" : "gate.locked").withStyle(met ? ChatFormatting.GREEN : ChatFormatting.RED),
+                dev.remold.RemoldText.tr("gate.requires", describe(requirement)).withStyle(ChatFormatting.GRAY));
+    }
+
+    /** "Stage: nether" or the advancement's title. */
+    public static Component describe(String requirement) {
+        if (requirement.startsWith(dev.remold.server.Gates.STAGE_PREFIX)) {
+            return dev.remold.RemoldText.tr("gate.stage", requirement.substring(dev.remold.server.Gates.STAGE_PREFIX.length()));
+        }
+        Minecraft mc = Minecraft.getInstance();
+        net.minecraft.resources.ResourceLocation id = net.minecraft.resources.ResourceLocation.tryParse(requirement);
+        if (id != null && mc.player != null) {
+            var holder = mc.player.connection.getAdvancements().get(id);
+            if (holder != null && holder.value().display().isPresent()) {
+                return holder.value().display().get().getTitle().copy();
+            }
+        }
+        return Component.literal(requirement);
     }
 
     public static void handle(Payloads.ImportList payload) {

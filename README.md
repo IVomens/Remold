@@ -26,6 +26,7 @@ press **Save**. That's it.
 | **Make unobtainable** | One click removes every recipe (from every mod and machine) that makes an item, and tags it. |
 | **JEI / EMI / REI** | Drag items from the item list onto the editor slots, and use the **+** button on any recipe to load it into the editor. Machine icons come from the viewer's catalysts/workstations. With JEI and EMI, **R** / **U** work on editor slots. |
 | **One-click unification** | **Recipes... → Unify...** finds materials that several mods add (more than one item in a common tag like `#c:ingots/copper`). Pick the preferred item and Remold makes every recipe produce it, lets recipes accept any variant, hides the others from JEI/EMI/REI with a tooltip, and can convert them in players' inventories. One Undo step; run it again after adding mods. |
+| **Recipe locks** | Lock any recipe behind an **advancement** or a **stage** (**Recipes... → Lock...**). Locked recipes give no result in the crafting table or inventory grid until the player unlocks them, and show a padlock in JEI and EMI. Grant stages with `/remold stage grant <player> <stage>`, so quest mods can unlock recipes as a reward. |
 | **Item tag editor** | Add items to or remove items from any item tag (or create new ones), e.g. put a modded copper ingot in `#c:ingots/copper` so it works in every mod's recipes. Found under **Recipes... → Tags...** |
 | **Bulk changes** | **Recipes... → Bulk...**: replace an item with another in every recipe, remove every recipe that uses an item, or remove every recipe from a mod. Shows what will change first, and the whole action is one Undo step. |
 | **Usage view** | Search recipes by what they *make* or what they *use*, or click **Uses** on any recipe. The tooltip screen shows how many recipes use an item before you make it unobtainable. |
@@ -63,6 +64,8 @@ press **Save**. That's it.
 | `/remold` | open the editor |
 | `/remold apply` | apply queued changes (same as `/reload`) |
 | `/remold undo` | undo the most recent change |
+| `/remold stage grant\|revoke <players> <stage>` | unlock or re-lock recipes locked behind that stage |
+| `/remold stage list <player>` | show a player's stages |
 | `/remold list` | list every change, with author |
 | `/remold export` | export to `remold-exports/` (datapack zip + KubeJS script) |
 

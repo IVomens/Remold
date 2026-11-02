@@ -37,6 +37,21 @@ public final class UiDraw {
         g.blitSprite(FLAME, x, y, 14, 14);
     }
 
+    /** A small padlock, 9×10, drawn with fills. Red when locked, green when unlocked. */
+    public static void padlock(GuiGraphics g, int x, int y, boolean locked) {
+        int body = locked ? 0xFFD03030 : 0xFF30B030;
+        int dark = 0xFF202020;
+        // shackle
+        g.fill(x + 2, y, x + 7, y + 1, dark);
+        g.fill(x + 1, y + 1, x + 2, y + 5, dark);
+        // an open lock has its right arm lifted out of the body
+        g.fill(x + 7, y + 1, x + 8, locked ? y + 5 : y + 2, dark);
+        // body
+        g.fill(x, y + 4, x + 9, y + 10, dark);
+        g.fill(x + 1, y + 5, x + 8, y + 9, body);
+        g.fill(x + 4, y + 6, x + 5, y + 8, dark);
+    }
+
     public static void highlight(GuiGraphics g, int x, int y, int size) {
         g.fillGradient(net.minecraft.client.renderer.RenderType.guiOverlay(), x, y, x + size, y + size, 0x80FFFFFF, 0x80FFFFFF, 0);
     }

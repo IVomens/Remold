@@ -1,0 +1,10 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.remold.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": ["CraftingMenuMixin"],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

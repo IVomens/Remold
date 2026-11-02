@@ -43,6 +43,8 @@ import java.util.concurrent.CompletableFuture;
  *   remold_history.json       previous versions, for undo
  *   remold_tags.json          tag edits
  *   remold_unify.json         item unification settings
+ *   remold_gates.json         locked recipes: recipe id -> advancement id or "stage:name"
+ *   remold_stages.json        stages granted to each player
  *   data/&lt;namespace&gt;/tags/item/&lt;path&gt;.json
  *   data/&lt;namespace&gt;/recipe/&lt;path&gt;.json
  * </pre>
@@ -70,6 +72,12 @@ public final class RemoldPack {
     private final Map<ResourceLocation, TagEdit> tagEdits = new TreeMap<>();
     private UnifySettings unify = UnifySettings.EMPTY;
     private static final String UNIFY_FILE = "remold_unify.json";
+    private static final String GATES_FILE = "remold_gates.json";
+    private static final String STAGES_FILE = "remold_stages.json";
+    private static final Codec<Map<ResourceLocation, String>> GATES_CODEC = Codec.unboundedMap(ResourceLocation.CODEC, Codec.STRING);
+    private static final Codec<Map<String, List<String>>> STAGES_CODEC = Codec.unboundedMap(Codec.STRING, Codec.STRING.listOf());
+    private final Map<ResourceLocation, String> gates = new TreeMap<>();
+    private final Map<java.util.UUID, java.util.Set<String>> stages = new java.util.HashMap<>();
     private long batch;
     private String batchAuthor = "";
     private boolean pendingApply;
@@ -97,9 +105,11 @@ public final class RemoldPack {
 
     public static void onServerTick(MinecraftServer server) {
         Unifier.tick(server);
+        Gates.tick(server);
     }
 
     public static void onServerStopped() {
+        Gates.onServerStopped();
         instance = null;
     }
 
@@ -126,6 +136,14 @@ public final class RemoldPack {
                         .ifPresent(tagEdits::putAll));
 
         loadUnify();
+        loadGates();
+        readJson(root.resolve(STAGES_FILE)).flatMap(json -> STAGES_CODEC.parse(JsonOps.INSTANCE, json).result()).ifPresent(map ->
+                map.forEach((uuid, list) -> {
+                    try {
+                        stages.put(java.util.UUID.fromString(uuid), new java.util.TreeSet<>(list));
+                    } catch (IllegalArgumentException ignored) {
+                    }
+                }));
 
         // Pack-wide defaults (shipped by modpacks) first, then the world's own annotations on top.
         Path global = dev.remold.platform.Services.PLATFORM.configDir().resolve(Remold.MOD_ID).resolve("annotations.json");
@@ -230,16 +248,61 @@ public final class RemoldPack {
 
     /** Stores the unification settings (undoable with the rest of the current batch). */
     public void setUnify(UnifySettings settings) throws IOException {
-        ensurePack();
+        rememberConfig(UNIFY_FILE);
         Path file = root.resolve(UNIFY_FILE);
-        Optional<String> previous = Files.isRegularFile(file)
-                ? Optional.of(Files.readString(file, StandardCharsets.UTF_8)) : Optional.empty();
-        history.add(new HistoryEntry(batch, false, Remold.id("unify"), previous, Optional.empty(), Optional.empty(),
-                batchAuthor, System.currentTimeMillis(), false, Optional.empty(), Optional.of(UNIFY_FILE)));
-        saveHistory();
         unify = settings;
         Unifier.invalidate();
         writeJson(file, UnifySettings.CODEC.encodeStart(JsonOps.INSTANCE, settings).getOrThrow());
+    }
+
+    private void loadGates() {
+        gates.clear();
+        readJson(root.resolve(GATES_FILE)).flatMap(json -> GATES_CODEC.parse(JsonOps.INSTANCE, json)
+                .resultOrPartial(e -> Remold.LOG.error("Bad {}: {}", GATES_FILE, e))).ifPresent(gates::putAll);
+    }
+
+    public Map<ResourceLocation, String> gates() {
+        return Map.copyOf(gates);
+    }
+
+    /** Locks recipes (value: advancement id or "stage:name") or unlocks them (empty value). Undoable. */
+    public void setGates(Map<ResourceLocation, String> changes) throws IOException {
+        rememberConfig(GATES_FILE);
+        changes.forEach((id, requirement) -> {
+            if (requirement.isEmpty()) gates.remove(id);
+            else gates.put(id, requirement);
+        });
+        writeJson(root.resolve(GATES_FILE), GATES_CODEC.encodeStart(JsonOps.INSTANCE, gates).getOrThrow());
+    }
+
+    public java.util.Set<String> stages(java.util.UUID player) {
+        return java.util.Set.copyOf(stages.getOrDefault(player, java.util.Set.of()));
+    }
+
+    /** Grants or revokes a stage. This is player progress, so it isn't part of Undo. */
+    public boolean setStage(java.util.UUID player, String stage, boolean granted) throws IOException {
+        java.util.Set<String> set = stages.computeIfAbsent(player, p -> new java.util.TreeSet<>());
+        boolean changed = granted ? set.add(stage) : set.remove(stage);
+        if (changed) {
+            ensurePack();
+            Map<String, List<String>> out = new TreeMap<>();
+            stages.forEach((uuid, s) -> {
+                if (!s.isEmpty()) out.put(uuid.toString(), List.copyOf(s));
+            });
+            writeJson(root.resolve(STAGES_FILE), STAGES_CODEC.encodeStart(JsonOps.INSTANCE, out).getOrThrow());
+        }
+        return changed;
+    }
+
+    /** Records a settings file's current content so the current batch can be undone. */
+    private void rememberConfig(String fileName) throws IOException {
+        ensurePack();
+        Path file = root.resolve(fileName);
+        Optional<String> previous = Files.isRegularFile(file)
+                ? Optional.of(Files.readString(file, StandardCharsets.UTF_8)) : Optional.empty();
+        history.add(new HistoryEntry(batch, false, Remold.id(fileName.replace(".json", "")), previous, Optional.empty(), Optional.empty(),
+                batchAuthor, System.currentTimeMillis(), false, Optional.empty(), Optional.of(fileName)));
+        saveHistory();
     }
 
     public record UndoResult(int changes, boolean recipes, boolean annotations, String author) {}
@@ -259,6 +322,7 @@ public final class RemoldPack {
                 if (entry.previousFile().isPresent()) Files.writeString(file, entry.previousFile().get(), StandardCharsets.UTF_8);
                 else Files.deleteIfExists(file);
                 loadUnify();
+                loadGates();
                 notes = true;
                 continue;
             }
