@@ -127,9 +127,9 @@ same way templates already are). 1.20.1 has no data components, so item data wou
 
 ### Releases
 
-Push a version tag (for example `git tag v0.1.0-beta.1 && git push origin v0.1.0-beta.1`) and
-`.github/workflows/release.yml` builds both jars with that version and publishes them on the
-Releases page, with the matching section of `CHANGELOG.md` as the notes. Versions containing a `-`
+On GitHub, open **Actions → Release → Run workflow** and enter a version (for example
+`0.1.0-beta.1`), or push a tag like `v0.1.0-beta.1`. `.github/workflows/release.yml` builds both
+jars with that version and publishes them on the Releases page, with the matching section of `CHANGELOG.md` as the notes. Versions containing a `-`
 (such as `-beta.1`) are marked as pre-releases.
 
 ### Nightly builds
