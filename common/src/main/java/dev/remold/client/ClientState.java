@@ -39,6 +39,27 @@ public final class ClientState {
     }
 
     private static boolean canUndo;
+    private static Map<ResourceLocation, String> gates = Map.of();
+    private static java.util.Set<String> unlocked = java.util.Set.of();
+
+    public static void setGates(Map<ResourceLocation, String> map, java.util.Set<String> met) {
+        gates = Map.copyOf(map);
+        unlocked = java.util.Set.copyOf(met);
+    }
+
+    public static Map<ResourceLocation, String> gates() {
+        return gates;
+    }
+
+    /** The requirement locking this recipe, or null if it isn't locked. */
+    @org.jetbrains.annotations.Nullable
+    public static String gate(ResourceLocation recipe) {
+        return gates.get(recipe);
+    }
+
+    public static boolean isUnlocked(String requirement) {
+        return unlocked.contains(requirement);
+    }
     private static Map<ResourceLocation, dev.remold.data.TagEdit> tagEdits = Map.of();
 
     public static Map<ResourceLocation, dev.remold.data.TagEdit> tagEdits() {
@@ -80,6 +101,8 @@ public final class ClientState {
         changes = List.of();
         pendingApply = false;
         canUndo = false;
+        gates = Map.of();
+        unlocked = java.util.Set.of();
         tagEdits = Map.of();
         unify = dev.remold.data.UnifySettings.EMPTY;
         dev.remold.core.TemplateCache.clear();

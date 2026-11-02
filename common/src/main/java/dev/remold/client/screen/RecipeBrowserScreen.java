@@ -41,7 +41,7 @@ public class RecipeBrowserScreen extends Screen {
     private boolean changesOnly;
     private EditBox search;
     private RowList list;
-    private Button edit, remove, revert, undo, uses;
+    private Button edit, remove, revert, undo, uses, lock;
     @Nullable private Row selected;
 
     record Row(ResourceLocation id, @Nullable RecipeHolder<?> holder, ItemStack icon, String type, @Nullable ChangeEntry change) {}
@@ -100,22 +100,27 @@ public class RecipeBrowserScreen extends Screen {
         addRenderableWidget(list);
 
         int y = height - 30;
-        int x = width / 2 - 182;
-        edit = addRenderableWidget(Button.builder(RemoldText.tr("browser.edit"), b -> editSelected()).bounds(x, y, 50, 20).build());
+        int x = width / 2 - 184;
+        int w = 44, step = 46;
+        edit = addRenderableWidget(Button.builder(RemoldText.tr("browser.edit"), b -> editSelected()).bounds(x, y, w, 20).build());
         edit.setTooltip(Tooltip.create(RemoldText.tr("browser.edit.hint")));
-        remove = addRenderableWidget(Button.builder(RemoldText.tr("browser.remove").withStyle(ChatFormatting.RED), b -> action(Payloads.Action.REMOVE)).bounds(x + 52, y, 50, 20).build());
+        remove = addRenderableWidget(Button.builder(RemoldText.tr("browser.remove").withStyle(ChatFormatting.RED), b -> action(Payloads.Action.REMOVE)).bounds(x + step, y, w, 20).build());
         remove.setTooltip(Tooltip.create(RemoldText.tr("browser.remove.hint")));
-        revert = addRenderableWidget(Button.builder(RemoldText.tr("browser.restore"), b -> action(Payloads.Action.REVERT)).bounds(x + 104, y, 50, 20).build());
+        revert = addRenderableWidget(Button.builder(RemoldText.tr("browser.restore"), b -> action(Payloads.Action.REVERT)).bounds(x + step * 2, y, w, 20).build());
         revert.setTooltip(Tooltip.create(RemoldText.tr("browser.restore.hint")));
-        uses = addRenderableWidget(Button.builder(RemoldText.tr("browser.uses"), b -> showUses()).bounds(x + 156, y, 50, 20).build());
+        uses = addRenderableWidget(Button.builder(RemoldText.tr("browser.uses"), b -> showUses()).bounds(x + step * 3, y, w, 20).build());
         uses.setTooltip(Tooltip.create(RemoldText.tr("browser.uses.hint")));
+        lock = addRenderableWidget(Button.builder(RemoldText.tr("browser.lock"), b -> {
+            if (selected != null && selected.holder() != null) minecraft.setScreen(new GateScreen(this, selected.holder()));
+        }).bounds(x + step * 4, y, w, 20).build());
+        lock.setTooltip(Tooltip.create(RemoldText.tr("browser.lock.hint")));
         undo = addRenderableWidget(Button.builder(RemoldText.tr("browser.undo"), b -> Services.PLATFORM.sendToServer(
-                new Payloads.RecipeAction(Payloads.Action.UNDO, dev.remold.Remold.id("none"), !hasShiftDown()))).bounds(x + 208, y, 50, 20).build());
+                new Payloads.RecipeAction(Payloads.Action.UNDO, dev.remold.Remold.id("none"), !hasShiftDown()))).bounds(x + step * 5, y, w, 20).build());
         undo.setTooltip(Tooltip.create(RemoldText.tr("browser.undo.hint")));
         Button apply = addRenderableWidget(Button.builder(RemoldText.tr("browser.apply"), b -> Services.PLATFORM.sendToServer(Payloads.RecipeAction.simple(Payloads.Action.APPLY)))
-                .bounds(x + 260, y, 50, 20).build());
+                .bounds(x + step * 6, y, w, 20).build());
         apply.setTooltip(Tooltip.create(RemoldText.tr("browser.apply.hint")));
-        addRenderableWidget(Button.builder(CommonComponents.GUI_BACK, b -> onClose()).bounds(x + 312, y, 52, 20).build());
+        addRenderableWidget(Button.builder(CommonComponents.GUI_BACK, b -> onClose()).bounds(x + step * 7, y, w, 20).build());
         refresh();
         setInitialFocus(search);
     }
@@ -194,6 +199,7 @@ public class RecipeBrowserScreen extends Screen {
         remove.active = row != null && row.holder() != null;
         revert.active = row != null && row.change() != null;
         uses.active = row != null && row.holder() != null;
+        lock.active = row != null && row.holder() != null;
     }
 
     private void editSelected() {
@@ -276,6 +282,8 @@ public class RecipeBrowserScreen extends Screen {
             @Override
             public void render(GuiGraphics g, int index, int top, int left, int width, int height, int mouseX, int mouseY, boolean hovering, float partialTick) {
                 g.renderItem(row.icon(), left + 2, top + 2);
+                String gate = ClientState.gate(row.id());
+                if (gate != null) dev.remold.client.widget.UiDraw.padlock(g, left + width - 12, top + 1, !ClientState.isUnlocked(gate));
                 int textX = left + 22;
                 if (row.change() != null) {
                     ChangeEntry.Kind kind = row.change().kind();

@@ -19,7 +19,7 @@
     "emi": ["dev.remold.compat.emi.RemoldEmiPlugin"],
     "rei_client": ["dev.remold.compat.rei.RemoldReiPlugin"]
   },
-  "mixins": ["remold.mixins.json"],
+  "mixins": ["remold.mixins.json", "remold.common.mixins.json"],
   "depends": {
     "fabricloader": ">=${fabric_loader_version}",
     "fabric-api": "*",

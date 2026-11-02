@@ -12,12 +12,17 @@ import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.commands.arguments.EntityArgument;
+import com.mojang.brigadier.arguments.StringArgumentType;
 
 /**
  * <pre>
  * /remold          open the editor
  * /remold apply    reload datapacks so saved changes take effect (and re-read config/remold/remold.json)
  * /remold undo     undo the most recent change
+ * /remold stage grant|revoke &lt;players&gt; &lt;stage&gt;   unlock recipes locked behind "stage:&lt;stage&gt;"
+ * /remold stage list &lt;player&gt;
  * /remold list     list every change made with Remold
  * /remold export   export a shareable datapack zip + KubeJS script
  * </pre>
@@ -28,6 +33,24 @@ public final class RemoldCommands {
     /** Command output is translated; the English fallback covers consoles without Remold's language files. */
     private static MutableComponent msg(String key, String fallback, Object... args) {
         return Component.translatableWithFallback("remold.command." + key, fallback, args);
+    }
+
+    private static int stage(com.mojang.brigadier.context.CommandContext<CommandSourceStack> ctx, boolean grant) throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+        String stage = StringArgumentType.getString(ctx, "stage");
+        int changed = 0;
+        for (ServerPlayer player : EntityArgument.getPlayers(ctx, "players")) {
+            try {
+                if (RemoldPack.get(ctx.getSource().getServer()).setStage(player.getUUID(), stage, grant)) changed++;
+            } catch (java.io.IOException e) {
+                ctx.getSource().sendFailure(msg("failed", "[Remold] Failed: %s", String.valueOf(e.getMessage())));
+                return 0;
+            }
+            Gates.sync(player);
+        }
+        int count = changed;
+        ctx.getSource().sendSuccess(() -> msg(grant ? "stage_granted" : "stage_revoked",
+                grant ? "[Remold] Granted stage %s to %s player(s)" : "[Remold] Revoked stage %s from %s player(s)", stage, count), true);
+        return changed;
     }
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
@@ -73,6 +96,18 @@ public final class RemoldCommands {
                         return 0;
                     }
                 }))
+                .then(Commands.literal("stage")
+                        .then(Commands.literal("grant").then(Commands.argument("players", EntityArgument.players())
+                                .then(Commands.argument("stage", StringArgumentType.word()).executes(ctx -> stage(ctx, true)))))
+                        .then(Commands.literal("revoke").then(Commands.argument("players", EntityArgument.players())
+                                .then(Commands.argument("stage", StringArgumentType.word()).executes(ctx -> stage(ctx, false)))))
+                        .then(Commands.literal("list").then(Commands.argument("player", EntityArgument.player()).executes(ctx -> {
+                            ServerPlayer player = EntityArgument.getPlayer(ctx, "player");
+                            var stages = RemoldPack.get(ctx.getSource().getServer()).stages(player.getUUID());
+                            ctx.getSource().sendSuccess(() -> msg("stages", "[Remold] %s has stages: %s",
+                                    player.getDisplayName(), stages.isEmpty() ? "-" : String.join(", ", new java.util.TreeSet<>(stages))), false);
+                            return stages.size();
+                        }))))
                 .then(Commands.literal("list").executes(ctx -> {
                     var changes = RemoldPack.get(ctx.getSource().getServer()).changes();
                     ctx.getSource().sendSuccess(() -> msg("count", "[Remold] %s change(s)", changes.size()).withStyle(ChatFormatting.GOLD), false);

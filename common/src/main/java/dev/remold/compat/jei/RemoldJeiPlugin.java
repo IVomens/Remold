@@ -69,6 +69,30 @@ public class RemoldJeiPlugin implements IModPlugin {
         });
     }
 
+    /** Padlock on locked crafting recipes (recipe gating). */
+    @Override
+    public void registerAdvanced(mezz.jei.api.registration.IAdvancedRegistration registration) {
+        registration.addRecipeCategoryDecorator(mezz.jei.api.constants.RecipeTypes.CRAFTING, new mezz.jei.api.recipe.category.extensions.IRecipeCategoryDecorator<>() {
+            @Override
+            public void draw(RecipeHolder<net.minecraft.world.item.crafting.CraftingRecipe> recipe, mezz.jei.api.recipe.category.IRecipeCategory<RecipeHolder<net.minecraft.world.item.crafting.CraftingRecipe>> category,
+                             IRecipeSlotsView slots, net.minecraft.client.gui.GuiGraphics g, double mouseX, double mouseY) {
+                String requirement = ClientState.gate(recipe.id());
+                if (requirement != null) {
+                    dev.remold.client.widget.UiDraw.padlock(g, category.getWidth() - 10, 0, !ClientState.isUnlocked(requirement));
+                }
+            }
+
+            @Override
+            public void decorateTooltips(mezz.jei.api.gui.builder.ITooltipBuilder tooltip, RecipeHolder<net.minecraft.world.item.crafting.CraftingRecipe> recipe,
+                                         mezz.jei.api.recipe.category.IRecipeCategory<RecipeHolder<net.minecraft.world.item.crafting.CraftingRecipe>> category,
+                                         IRecipeSlotsView slots, double mouseX, double mouseY) {
+                if (mouseX >= category.getWidth() - 10 && mouseX < category.getWidth() && mouseY >= 0 && mouseY < 10) {
+                    tooltip.addAll(dev.remold.client.RemoldClient.lockTooltip(recipe.id()));
+                }
+            }
+        });
+    }
+
     @Override
     public void registerRecipeTransferHandlers(IRecipeTransferRegistration registration) {
         registration.addUniversalRecipeTransferHandler(new TransferHandler());

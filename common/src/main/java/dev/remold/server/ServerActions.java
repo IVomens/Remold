@@ -92,6 +92,7 @@ public final class ServerActions {
                         return;
                     }
                     if (result.get().annotations()) broadcastAnnotations(server);
+                    Gates.syncAll(server);
                     if (result.get().recipes()) {
                         finish(player, payload.apply(), "undone", Integer.toString(result.get().changes()), result.get().author());
                     } else {
@@ -270,6 +271,11 @@ public final class ServerActions {
         }
     }
 
+    public static void handleGates(ServerPlayer player, Payloads.SetGates payload) {
+        if (!check(player)) return;
+        Gates.handleSet(player, payload);
+    }
+
     public static void handleUnify(ServerPlayer player, Payloads.Unify payload) {
         if (!check(player)) return;
         Unifier.apply(player, payload);
@@ -361,6 +367,7 @@ public final class ServerActions {
     /** Call when a player joins. */
     public static void onLogin(ServerPlayer player) {
         sendAccess(player);
+        Gates.sync(player);
         sendAnnotations(player);
         if (allowed(player)) sendChanges(player);
     }

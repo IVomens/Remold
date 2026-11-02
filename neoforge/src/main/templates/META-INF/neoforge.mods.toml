@@ -11,6 +11,9 @@ authors = "${mod_authors}"
 logoFile = "remold.png"
 description = '''${mod_description}'''
 
+[[mixins]]
+config = "remold.common.mixins.json"
+
 [[dependencies.${mod_id}]]
 modId = "neoforge"
 type = "required"

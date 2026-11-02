@@ -159,6 +159,19 @@ public final class Payloads {
         }
     }
 
+    /** Lock recipes (value: advancement id or "stage:name") or unlock them (empty value). */
+    public record SetGates(Map<ResourceLocation, String> gates) implements CustomPacketPayload {
+        public static final Type<SetGates> TYPE = Payloads.typeOf("set_gates");
+        public static final StreamCodec<ByteBuf, SetGates> CODEC = ByteBufCodecs
+                .<ByteBuf, ResourceLocation, String, Map<ResourceLocation, String>>map(HashMap::new, ResourceLocation.STREAM_CODEC, ByteBufCodecs.STRING_UTF8)
+                .map(SetGates::new, SetGates::gates);
+
+        @Override
+        public Type<SetGates> type() {
+            return TYPE;
+        }
+    }
+
     /** Ask the server for a recipe's original JSON, to use as a template for a machine. */
     public record RequestTemplate(ResourceLocation id) implements CustomPacketPayload {
         public static final Type<RequestTemplate> TYPE = Payloads.typeOf("request_template");
@@ -267,6 +280,20 @@ public final class Payloads {
 
         @Override
         public Type<ImportList> type() {
+            return TYPE;
+        }
+    }
+
+    /** All recipe locks, and which requirements this player has met. Sent to every player. */
+    public record SyncGates(Map<ResourceLocation, String> gates, java.util.Set<String> unlocked) implements CustomPacketPayload {
+        public static final Type<SyncGates> TYPE = Payloads.typeOf("sync_gates");
+        public static final StreamCodec<ByteBuf, SyncGates> CODEC = StreamCodec.composite(
+                ByteBufCodecs.<ByteBuf, ResourceLocation, String, Map<ResourceLocation, String>>map(HashMap::new, ResourceLocation.STREAM_CODEC, ByteBufCodecs.STRING_UTF8), SyncGates::gates,
+                ByteBufCodecs.STRING_UTF8.apply(ByteBufCodecs.collection(java.util.HashSet::new)), SyncGates::unlocked,
+                SyncGates::new);
+
+        @Override
+        public Type<SyncGates> type() {
             return TYPE;
         }
     }
