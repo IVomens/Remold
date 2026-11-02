@@ -30,6 +30,7 @@ public class RemoldFabricClient implements ClientModInitializer {
         toClient(Payloads.SyncChanges.TYPE, RemoldClient::handle);
         toClient(Payloads.TemplateJson.TYPE, RemoldClient::handle);
         toClient(Payloads.Access.TYPE, RemoldClient::handle);
+        toClient(Payloads.ImportList.TYPE, RemoldClient::handle);
         toClient(Payloads.Notice.TYPE, RemoldClient::handle);
 
         KeyBindingHelper.registerKeyBinding(OPEN_EDITOR);

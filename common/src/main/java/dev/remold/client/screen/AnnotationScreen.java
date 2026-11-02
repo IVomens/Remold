@@ -130,6 +130,22 @@ public class AnnotationScreen extends Screen {
 
     private void makeUnobtainable() {
         if (target.isEmpty()) return;
+        if (!hasAltDown()) {
+            java.util.Set<ResourceLocation> ids = new java.util.HashSet<>();
+            var registries = minecraft.level.registryAccess();
+            for (var h : minecraft.level.getRecipeManager().getRecipes()) {
+                if (dev.remold.core.RecipeUsage.produces(h.value(), java.util.Set.of(target.getItem()), registries)) ids.add(h.id());
+            }
+            var lost = RemovalCheck.lost(minecraft, ids, java.util.Set.of(target.getItem()));
+            if (!lost.isEmpty()) {
+                minecraft.setScreen(new WarningScreen(this, lost, this::doMakeUnobtainable));
+                return;
+            }
+        }
+        doMakeUnobtainable();
+    }
+
+    private void doMakeUnobtainable() {
         List<String> lines = new ArrayList<>();
         for (String v : values) if (!v.isBlank()) lines.add(v);
         if (!lines.contains(UNOBTAINABLE)) lines.addFirst(UNOBTAINABLE);

@@ -1,7 +1,7 @@
 modLoader = "javafml"
 loaderVersion = "${neoforge_loader_version_range}"
 license = "${mod_license}"
-issueTrackerURL = "https://github.com/ivomens/better-crafter-thing/issues"
+issueTrackerURL = "https://github.com/IVomens/Remold/issues"
 
 [[mods]]
 modId = "${mod_id}"

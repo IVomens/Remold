@@ -7,8 +7,8 @@
   "authors": ["${mod_authors}"],
   "license": "${mod_license}",
   "contact": {
-    "issues": "https://github.com/IVomens/better-crafter-thing/issues",
-    "sources": "https://github.com/IVomens/better-crafter-thing"
+    "issues": "https://github.com/IVomens/Remold/issues",
+    "sources": "https://github.com/IVomens/Remold"
   },
   "environment": "*",
   "entrypoints": {

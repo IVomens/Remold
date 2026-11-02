@@ -69,6 +69,8 @@ public class RecipeBrowserScreen extends Screen {
         int x0 = width / 2 - 182;
         addRenderableWidget(Button.builder(RemoldText.tr("browser.tags"), b -> minecraft.setScreen(new TagEditorScreen(this)))
                 .bounds(x0, 4, 60, 16).build()).setTooltip(Tooltip.create(RemoldText.tr("browser.tags.hint")));
+        addRenderableWidget(Button.builder(RemoldText.tr("browser.import"), b -> minecraft.setScreen(new ImportScreen(this)))
+                .bounds(x0 + 64, 4, 60, 16).build()).setTooltip(Tooltip.create(RemoldText.tr("browser.import.hint")));
         addRenderableWidget(Button.builder(RemoldText.tr("browser.bulk"), b -> minecraft.setScreen(new BulkScreen(this)))
                 .bounds(x0 + 304, 4, 60, 16).build()).setTooltip(Tooltip.create(RemoldText.tr("browser.bulk.hint")));
 
@@ -200,7 +202,15 @@ public class RecipeBrowserScreen extends Screen {
 
     private void action(Payloads.Action action) {
         if (selected == null) return;
-        Services.PLATFORM.sendToServer(new Payloads.RecipeAction(action, selected.id(), !hasShiftDown()));
+        Payloads.RecipeAction payload = new Payloads.RecipeAction(action, selected.id(), !hasShiftDown());
+        if (action == Payloads.Action.REMOVE && !hasAltDown()) {
+            var lost = RemovalCheck.lost(minecraft, java.util.Set.of(selected.id()), java.util.Set.of());
+            if (!lost.isEmpty()) {
+                minecraft.setScreen(new WarningScreen(this, lost, () -> Services.PLATFORM.sendToServer(payload)));
+                return;
+            }
+        }
+        Services.PLATFORM.sendToServer(payload);
     }
 
     @Override

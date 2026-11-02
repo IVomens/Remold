@@ -60,6 +60,11 @@ public class NeoForgePlatform implements RemoldPlatform {
     }
 
     @Override
+    public net.minecraft.world.inventory.MenuType<?> unregisteredMenuType() {
+        return net.neoforged.neoforge.common.extensions.IMenuTypeExtension.create((id, inventory, buf) -> null);
+    }
+
+    @Override
     public JsonObject disabledRecipeJson() {
         // {"neoforge:conditions": [{"type": "neoforge:false"}]}
         JsonObject condition = new JsonObject();

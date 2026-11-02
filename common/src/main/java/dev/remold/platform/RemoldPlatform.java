@@ -30,6 +30,9 @@ public interface RemoldPlatform {
      */
     JsonObject disabledRecipeJson();
 
+    /** A menu type that is never registered, for the client-only editor menu (vanilla's constructor is private). */
+    net.minecraft.world.inventory.MenuType<?> unregisteredMenuType();
+
     /**
      * The tag file that applies Remold's edits to a tag.
      *

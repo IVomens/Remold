@@ -22,10 +22,12 @@ press **Save**. That's it.
 | **Item data without JSON** | Give the output a custom name, lore lines, glint, rarity, unbreakable, model data and count, using `&` colour codes. |
 | **Item tooltips everywhere** | Add lines like a red **ITEM UNOBTAINABLE** to an item for every player, and optionally hide it from JEI/EMI. |
 | **Make unobtainable** | One click removes every recipe (from every mod and machine) that makes an item, and tags it. |
-| **JEI / EMI / REI** | Drag items from the item list onto the editor slots. Machine icons come from the viewer's catalysts/workstations. With JEI, the **+** button on any recipe loads it into the editor, and **R** / **U** work on editor slots (also with EMI). |
+| **JEI / EMI / REI** | Drag items from the item list onto the editor slots, and use the **+** button on any recipe to load it into the editor. Machine icons come from the viewer's catalysts/workstations. With JEI and EMI, **R** / **U** work on editor slots. |
 | **Item tag editor** | Add items to or remove items from any item tag (or create new ones), e.g. put a modded copper ingot in `#c:ingots/copper` so it works in every mod's recipes. Found under **Recipes... → Tags...** |
 | **Bulk changes** | **Recipes... → Bulk...**: replace an item with another in every recipe, remove every recipe that uses an item, or remove every recipe from a mod. Shows what will change first, and the whole action is one Undo step. |
 | **Usage view** | Search recipes by what they *make* or what they *use*, or click **Uses** on any recipe. The tooltip screen shows how many recipes use an item before you make it unobtainable. |
+| **Progression checker** | Before saving, removing or making something unobtainable, Remold warns about items that would no longer be craftable, and about duplication loops (e.g. 9 ingots → 1 block → 10 ingots). Hold Alt to skip. |
+| **Import shared packs** | **Recipes... → Import...** applies a pack made with `/remold export` (from any server, NeoForge or Fabric) from the `remold-imports` folder, as one Undo step. Recipes for mods that aren't installed are skipped. |
 | **Conflict warnings** | Saving a recipe that uses the same items as an existing one (which Minecraft would silently ignore) asks you to replace the other recipe, save anyway, or cancel. |
 | **Undo** | Every change is recorded. **Undo** in the recipe browser (or `/remold undo`) steps back one action at a time, including bulk ones like "make unobtainable". |
 | **Permissions** | `config/remold/remold.json` sets the permission level needed, and can allow specific players who aren't operators. |
@@ -47,7 +49,8 @@ press **Save**. That's it.
 3. Click **the machine bar** to choose a crafting table, a furnace, or any modded machine.
 4. Put items in the slots:
    - click an item in your inventory to pick up a ghost copy, then click slots (hold to paint);
-   - or **Items...** to search every item (`@modid` filters by mod);
+   - or **Items...** to search every item (`@modid` filters by mod; right-click to favourite, and
+     favourites and recent items come first);
    - or drag from JEI / EMI / REI.
    Right-click clears a slot. Scroll over the output to change its count.
 5. **Save** (Ctrl+S). The recipe is live straight away.

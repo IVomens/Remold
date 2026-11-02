@@ -69,6 +69,12 @@ public class FabricPlatform implements RemoldPlatform {
     }
 
     @Override
+    public net.minecraft.world.inventory.MenuType<?> unregisteredMenuType() {
+        // Fabric API's access widener makes this constructor public.
+        return new net.minecraft.world.inventory.MenuType<>((id, inventory) -> null, net.minecraft.world.flag.FeatureFlags.VANILLA_SET);
+    }
+
+    @Override
     public JsonObject disabledRecipeJson() {
         // {"fabric:load_conditions": [{"condition": "fabric:not", "value": {"condition": "fabric:true"}}]}
         JsonObject alwaysTrue = new JsonObject();

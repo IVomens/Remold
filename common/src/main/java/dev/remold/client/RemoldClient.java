@@ -73,6 +73,12 @@ public final class RemoldClient {
         }
     }
 
+    public static void handle(Payloads.ImportList payload) {
+        if (Minecraft.getInstance().screen instanceof dev.remold.client.screen.ImportScreen screen) {
+            screen.receive(payload);
+        }
+    }
+
     public static void handle(Payloads.Access payload) {
         ClientState.setAccess(payload.permissionLevel(), payload.listed());
     }

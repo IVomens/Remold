@@ -134,13 +134,25 @@ public class BulkScreen extends Screen {
     }
 
     private void run() {
+        if (kind != Payloads.BulkKind.REPLACE_ITEM && !hasAltDown()) {
+            var lost = RemovalCheck.lost(minecraft, new java.util.HashSet<>(preview), java.util.Set.of());
+            if (!lost.isEmpty()) {
+                boolean apply = !hasShiftDown();
+                minecraft.setScreen(new WarningScreen(parent, lost, () -> send(apply)));
+                return;
+            }
+        }
+        send(!hasShiftDown());
+        onClose();
+    }
+
+    private void send(boolean apply) {
         String a = switch (kind) {
             case REMOVE_FROM_MOD -> mod;
             default -> BuiltInRegistries.ITEM.getKey(from.getItem()).toString();
         };
         String b = to.isEmpty() ? "" : BuiltInRegistries.ITEM.getKey(to.getItem()).toString();
-        Services.PLATFORM.sendToServer(new Payloads.Bulk(kind, a, b, scope, !hasShiftDown()));
-        onClose();
+        Services.PLATFORM.sendToServer(new Payloads.Bulk(kind, a, b, scope, apply));
     }
 
     @Override

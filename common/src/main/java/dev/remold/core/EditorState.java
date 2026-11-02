@@ -27,6 +27,35 @@ public final class EditorState {
     /** The recipe this draft was loaded from, if any. */
     @Nullable public ResourceLocation loadedFrom;
 
+    /** Fingerprint of the last saved / loaded / cleared state, to detect unsaved changes. */
+    private String clean = "";
+
+    /** A string that changes whenever anything the operator entered changes. */
+    public String fingerprint() {
+        StringBuilder sb = new StringBuilder(machine.id().toString()).append('|').append(machine.kind());
+        for (GhostIngredient g : inputs) {
+            sb.append('|').append(g.isEmpty() ? "-" : net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(g.stack().getItem()));
+            if (g.tag() != null) sb.append('#').append(g.tag().location());
+        }
+        for (ItemStack s : outputs) {
+            sb.append("|>").append(s.isEmpty() ? "-" : net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(s.getItem()) + "x" + s.getCount() + "@" + s.getComponentsPatch().hashCode());
+        }
+        sb.append('|').append(recipeId).append('|').append(cookTime).append('|').append(experience).append('|').append(exampleIndex);
+        for (String p : params) sb.append('|').append(p);
+        return sb.toString();
+    }
+
+    public void markClean() {
+        clean = fingerprint();
+    }
+
+    /** True if something was entered since the last save, load or clear. */
+    public boolean isDirty() {
+        boolean hasContent = java.util.Arrays.stream(inputs).anyMatch(g -> !g.isEmpty())
+                || java.util.Arrays.stream(outputs).anyMatch(s -> !s.isEmpty());
+        return hasContent && !fingerprint().equals(clean);
+    }
+
     public static GhostIngredient[] empty(int size) {
         GhostIngredient[] array = new GhostIngredient[size];
         Arrays.fill(array, GhostIngredient.EMPTY);

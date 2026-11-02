@@ -130,6 +130,20 @@ public final class Payloads {
         }
     }
 
+    /** List the packs in the import folder (file empty), or import one. */
+    public record ImportRequest(String file, boolean apply) implements CustomPacketPayload {
+        public static final Type<ImportRequest> TYPE = Payloads.typeOf("import_request");
+        public static final StreamCodec<ByteBuf, ImportRequest> CODEC = StreamCodec.composite(
+                ByteBufCodecs.STRING_UTF8, ImportRequest::file,
+                ByteBufCodecs.BOOL, ImportRequest::apply,
+                ImportRequest::new);
+
+        @Override
+        public Type<ImportRequest> type() {
+            return TYPE;
+        }
+    }
+
     /** Ask the server for a recipe's original JSON, to use as a template for a machine. */
     public record RequestTemplate(ResourceLocation id) implements CustomPacketPayload {
         public static final Type<RequestTemplate> TYPE = Payloads.typeOf("request_template");
@@ -212,6 +226,31 @@ public final class Payloads {
 
         @Override
         public Type<Access> type() {
+            return TYPE;
+        }
+    }
+
+    /** One pack in the import folder. {@code error} is empty when it could be read. */
+    public record ImportSummary(String file, int recipes, int removals, int tags, int annotations, String error) {
+        public static final StreamCodec<ByteBuf, ImportSummary> CODEC = StreamCodec.composite(
+                ByteBufCodecs.STRING_UTF8, ImportSummary::file,
+                ByteBufCodecs.VAR_INT, ImportSummary::recipes,
+                ByteBufCodecs.VAR_INT, ImportSummary::removals,
+                ByteBufCodecs.VAR_INT, ImportSummary::tags,
+                ByteBufCodecs.VAR_INT, ImportSummary::annotations,
+                ByteBufCodecs.STRING_UTF8, ImportSummary::error,
+                ImportSummary::new);
+    }
+
+    public record ImportList(List<ImportSummary> files, String folder) implements CustomPacketPayload {
+        public static final Type<ImportList> TYPE = Payloads.typeOf("import_list");
+        public static final StreamCodec<ByteBuf, ImportList> CODEC = StreamCodec.composite(
+                ImportSummary.CODEC.apply(ByteBufCodecs.list()), ImportList::files,
+                ByteBufCodecs.STRING_UTF8, ImportList::folder,
+                ImportList::new);
+
+        @Override
+        public Type<ImportList> type() {
             return TYPE;
         }
     }

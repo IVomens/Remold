@@ -35,6 +35,7 @@ public class RemoldFabric implements ModInitializer {
         toServer(Payloads.SetAnnotation.TYPE, Payloads.SetAnnotation.CODEC, ServerActions::handleAnnotation);
         toServer(Payloads.SetTag.TYPE, Payloads.SetTag.CODEC, ServerActions::handleTag);
         toServer(Payloads.Bulk.TYPE, Payloads.Bulk.CODEC, ServerActions::handleBulk);
+        toServer(Payloads.ImportRequest.TYPE, Payloads.ImportRequest.CODEC, ServerActions::handleImport);
         toServer(Payloads.RequestTemplate.TYPE, Payloads.RequestTemplate.CODEC, ServerActions::handleTemplateRequest);
 
         // Client-bound types are registered on both sides; their handlers are set in RemoldFabricClient.
@@ -42,6 +43,7 @@ public class RemoldFabric implements ModInitializer {
         PayloadTypeRegistry.playS2C().register(Payloads.SyncAnnotations.TYPE, Payloads.SyncAnnotations.CODEC);
         PayloadTypeRegistry.playS2C().register(Payloads.SyncChanges.TYPE, Payloads.SyncChanges.CODEC);
         PayloadTypeRegistry.playS2C().register(Payloads.TemplateJson.TYPE, Payloads.TemplateJson.CODEC);
+        PayloadTypeRegistry.playS2C().register(Payloads.ImportList.TYPE, Payloads.ImportList.CODEC);
         PayloadTypeRegistry.playS2C().register(Payloads.Access.TYPE, Payloads.Access.CODEC);
         PayloadTypeRegistry.playS2C().register(Payloads.Notice.TYPE, Payloads.Notice.CODEC);
     }

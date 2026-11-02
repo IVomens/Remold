@@ -137,7 +137,7 @@ public final class ServerActions {
         }
     }
 
-    private static boolean remove(ServerPlayer player, RemoldPack pack, ResourceLocation id) throws IOException {
+    static boolean remove(ServerPlayer player, RemoldPack pack, ResourceLocation id) throws IOException {
         var existing = pack.change(id);
         if (existing.isPresent() && existing.get().kind() == ChangeEntry.Kind.ADDED) {
             return pack.revert(id); // our own recipe: just delete it
@@ -270,6 +270,13 @@ public final class ServerActions {
         }
     }
 
+    public static void handleImport(ServerPlayer player, Payloads.ImportRequest payload) {
+        if (!check(player)) return;
+        if (!payload.file().isEmpty()) Importer.run(player, payload.file(), payload.apply());
+        Services.PLATFORM.sendToPlayer(player, new Payloads.ImportList(Importer.list(player.server),
+                Importer.folder(player.server).toAbsolutePath().normalize().toString()));
+    }
+
     public static void handleAnnotation(ServerPlayer player, Payloads.SetAnnotation payload) {
         if (!check(player)) return;
         try {
@@ -287,12 +294,12 @@ public final class ServerActions {
 
     // ------------------------------------------------------------------ helpers
 
-    private static ChangeEntry entry(ServerPlayer player, ResourceLocation id, ChangeEntry.Kind kind, String type) {
+    static ChangeEntry entry(ServerPlayer player, ResourceLocation id, ChangeEntry.Kind kind, String type) {
         return new ChangeEntry(id, kind, type, player.getGameProfile().getName(), System.currentTimeMillis());
     }
 
     /** Applies (reloads) if asked, keeping the operator informed. {@code what} is a notice key. */
-    private static void finish(ServerPlayer player, boolean apply, String what, String... args) {
+    static void finish(ServerPlayer player, boolean apply, String what, String... args) {
         MinecraftServer server = player.server;
         RemoldPack pack = RemoldPack.get(server);
         if (!apply) {
