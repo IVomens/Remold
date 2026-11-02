@@ -64,7 +64,7 @@ public class AnnotationScreen extends Screen {
                 }))).bounds(x0 + 120, 32, 100, 20).build());
         for (int i = 0; i < LINES; i++) {
             int line = i;
-            EditBox box = new EditBox(font, x0, 70 + i * 20, 220, 16, Component.empty());
+            EditBox box = new EditBox(font, x0, 66 + i * 18, 220, 16, Component.empty());
             box.setMaxLength(256);
             box.setValue(values[i]);
             if (i == 0) box.setHint(Component.literal("e.g. &c&lITEM UNOBTAINABLE").withStyle(ChatFormatting.DARK_GRAY));
@@ -72,13 +72,13 @@ public class AnnotationScreen extends Screen {
             box.active = !target.isEmpty();
             addRenderableWidget(box);
         }
-        int y = 70 + LINES * 20 + 4;
+        int y = 66 + LINES * 18 + 2;
         CycleButton<Boolean> hideButton = CycleButton.onOffBuilder(hide)
                 .create(x0, y, 220, 20, Component.literal("Hide from JEI / EMI"), (b, v) -> hide = v);
         hideButton.setTooltip(Tooltip.create(Component.literal("Hide this item from recipe viewers' item lists")));
         hideButton.active = !target.isEmpty();
         addRenderableWidget(hideButton);
-        y += 26;
+        y += 24;
 
         Button save = Button.builder(Component.literal("Save tooltip").withStyle(ChatFormatting.GREEN), b -> send(annotation()))
                 .bounds(x0, y, 108, 20).build();
@@ -92,15 +92,15 @@ public class AnnotationScreen extends Screen {
         }).bounds(x0 + 112, y, 108, 20).build();
         clear.active = !target.isEmpty();
         addRenderableWidget(clear);
-        y += 24;
+        y = height - 24;
 
         Button unobtainable = Button.builder(Component.literal("Make unobtainable").withStyle(ChatFormatting.RED), b -> makeUnobtainable())
-                .bounds(x0, y, 220, 20).build();
+                .bounds(x0, y, 140, 20).build();
         unobtainable.setTooltip(Tooltip.create(Component.literal("Removes EVERY recipe that makes this item (from all mods and machines) and adds a red \"ITEM UNOBTAINABLE\" tooltip.\nUndo it per recipe from \"Recipes...\" (filter: changes).")));
         unobtainable.active = !target.isEmpty();
         addRenderableWidget(unobtainable);
 
-        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose()).bounds(width / 2 - 50, height - 28, 100, 20).build());
+        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose()).bounds(x0 + 144, y, 76, 20).build());
     }
 
     private Annotation annotation() {
@@ -135,14 +135,14 @@ public class AnnotationScreen extends Screen {
         UiDraw.slot(g, x0, 33, 18);
         g.renderItem(target, x0 + 1, 34);
         g.drawString(font, target.isEmpty() ? Component.literal("No item selected").withStyle(ChatFormatting.RED) : target.getHoverName(), x0 + 22, 38, 0xFFFFFF);
-        g.drawString(font, "Tooltip lines (& colour codes)", x0, 60, 0xA0A0A0);
+        g.drawString(font, "Tooltip lines (& colour codes)", x0, 56, 0xA0A0A0);
         if (!target.isEmpty()) {
             // live preview
             int px = x0 + 230;
             List<Component> preview = new ArrayList<>();
             preview.add(target.getHoverName());
             for (String v : values) if (!v.isBlank()) preview.add(TextUtil.parse(v));
-            if (px + 100 < width) g.renderComponentTooltip(font, preview, px, 74);
+            if (px + 100 < width) g.renderComponentTooltip(font, preview, px, 70);
             if (mouseX >= x0 && mouseX < x0 + 18 && mouseY >= 33 && mouseY < 51) {
                 g.renderComponentTooltip(font, getTooltipFromItem(minecraft, target), mouseX, mouseY);
             }

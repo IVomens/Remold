@@ -57,7 +57,9 @@ public final class RemoldCommands {
                                 .withStyle(ChatFormatting.GREEN)
                                 .append(Component.literal(result.zip().getFileName().toString()).withStyle(s -> s
                                         .withUnderlined(true)
-                                        .withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_FILE, result.zip().getParent().toAbsolutePath().toString()))))
+                                        .withClickEvent(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, result.zip().toAbsolutePath().toString()))
+                                        .withHoverEvent(new net.minecraft.network.chat.HoverEvent(net.minecraft.network.chat.HoverEvent.Action.SHOW_TEXT,
+                                                Component.literal(result.zip().toAbsolutePath() + "\nClick to copy the path")))))
                                 .append(Component.literal(" and " + result.kubejs().getFileName()).withStyle(ChatFormatting.GREEN)), false);
                         return 1;
                     } catch (Exception e) {

@@ -50,9 +50,9 @@ import java.util.function.Consumer;
  */
 public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
     public static final int W = 200;
-    public static final int H = 242;
+    public static final int H = 236;
     public static final int INV_X = 20;
-    public static final int INV_Y = 162;
+    public static final int INV_Y = 156;
     private static final int MAX_TEMPLATE_INPUTS = 18;
     private static final int MAX_TEMPLATE_OUTPUTS = 4;
 
@@ -104,8 +104,8 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
         Machine machine = state.machine;
 
         boolean template = machine.isTemplate();
-        int machineWidth = template ? 132 : 184;
-        IconButton machineButton = new IconButton(x + 8, y + 16, machineWidth, 18, machine.name(), machine::icon, false,
+        int machineWidth = template && machine.examples().size() > 1 ? 120 : 184;
+        IconButton machineButton = new IconButton(x + 8, y + 15, machineWidth, 18, machine.name(), machine::icon, false,
                 b -> minecraft.setScreen(new MachineSelectScreen(this, m -> {
                     RecipeFactory.setMachine(state, m, registries());
                     updateAutoId();
@@ -115,8 +115,8 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
                 .append(Component.literal("\nClick to choose another machine").withStyle(ChatFormatting.GRAY))));
         addRenderableWidget(machineButton);
         if (template && machine.examples().size() > 1) {
-            Button prev = Button.builder(Component.literal("<"), b -> switchExample(-1)).bounds(x + 142, y + 16, 14, 18).build();
-            Button next = Button.builder(Component.literal(">"), b -> switchExample(1)).bounds(x + 178, y + 16, 14, 18).build();
+            Button prev = Button.builder(Component.literal("<"), b -> switchExample(-1)).bounds(x + 130, y + 15, 14, 18).build();
+            Button next = Button.builder(Component.literal(">"), b -> switchExample(1)).bounds(x + 178, y + 15, 14, 18).build();
             Tooltip tip = Tooltip.create(Component.literal("Switch the existing recipe used as a template.\nEvery machine works differently, so Remold starts from a real recipe and lets you change its items and values."));
             prev.setTooltip(tip);
             next.setTooltip(tip);
@@ -125,13 +125,13 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
         }
 
         if (machine.kind().cooking()) {
-            EditBox time = new EditBox(font, x + 150, y + 52, 42, 14, Component.literal("Cooking time"));
+            EditBox time = new EditBox(font, x + 150, y + 48, 42, 14, Component.literal("Cooking time"));
             time.setValue(Integer.toString(state.cookTime));
             time.setFilter(s -> s.matches("\\d{0,6}"));
             time.setResponder(s -> state.cookTime = s.isEmpty() ? 0 : Integer.parseInt(s));
             time.setTooltip(Tooltip.create(Component.literal("Cooking time in ticks (20 ticks = 1 second)")));
             addRenderableWidget(time);
-            EditBox xp = new EditBox(font, x + 150, y + 82, 42, 14, Component.literal("Experience"));
+            EditBox xp = new EditBox(font, x + 150, y + 76, 42, 14, Component.literal("Experience"));
             xp.setValue(Float.toString(state.experience));
             xp.setFilter(s -> s.matches("\\d{0,4}(\\.\\d{0,3})?"));
             xp.setResponder(s -> {
@@ -144,12 +144,12 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
         }
         if (template && state.template != null && !state.template.params.isEmpty()) {
             Button params = Button.builder(Component.literal("Values..."), b -> minecraft.setScreen(new ParamsScreen(this)))
-                    .bounds(x + 144, y + 84, 48, 16).build();
+                    .bounds(x + 144, y + 80, 48, 16).build();
             params.setTooltip(Tooltip.create(Component.literal("Edit numbers and other values of this recipe (time, energy, chance, fluids...)")));
             addRenderableWidget(params);
         }
 
-        idBox = new EditBox(font, x + 8, y + 106, 184, 14, Component.literal("Recipe id"));
+        idBox = new EditBox(font, x + 8, y + 100, 184, 14, Component.literal("Recipe id"));
         idBox.setMaxLength(200);
         idBox.setHint(Component.literal("recipe id, e.g. remold:my_recipe").withStyle(ChatFormatting.DARK_GRAY));
         settingId = true;
@@ -164,7 +164,7 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
         addRenderableWidget(idBox);
 
         Button save = Button.builder(Component.literal("Save").withStyle(ChatFormatting.GREEN), b -> save(!hasShiftDown()))
-                .bounds(x + 8, y + 124, 60, 16).build();
+                .bounds(x + 8, y + 117, 60, 16).build();
         save.setTooltip(Tooltip.create(Component.literal("Save and apply the recipe (Ctrl+S)\n")
                 .append(Component.literal("Shift-click to save without reloading, to apply many changes at once.").withStyle(ChatFormatting.GRAY))));
         addRenderableWidget(save);
@@ -172,25 +172,25 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
             state.clear();
             cursor = ItemStack.EMPTY;
             rebuildWidgets();
-        }).bounds(x + 70, y + 124, 60, 16).build();
+        }).bounds(x + 70, y + 117, 60, 16).build();
         clear.setTooltip(Tooltip.create(Component.literal("Empty all slots and start a new recipe")));
         addRenderableWidget(clear);
         Button items = Button.builder(Component.literal("Items..."), b -> minecraft.setScreen(new ItemPickerScreen(this, stack -> cursor = stack)))
-                .bounds(x + 132, y + 124, 60, 16).build();
+                .bounds(x + 132, y + 117, 60, 16).build();
         items.setTooltip(Tooltip.create(Component.literal("Search every item in the game")));
         addRenderableWidget(items);
 
         Button data = Button.builder(Component.literal("Item data..."), b -> openItemData())
-                .bounds(x + 8, y + 142, 60, 16).build();
+                .bounds(x + 8, y + 135, 60, 16).build();
         data.setTooltip(Tooltip.create(Component.literal("Change the output's name, lore, glint, rarity... ")
                 .append(Component.literal("\ne.g. a red \"ITEM UNOBTAINABLE\" line").withStyle(ChatFormatting.GRAY))));
         addRenderableWidget(data);
         Button tooltip = Button.builder(Component.literal("Tooltip..."), b -> openAnnotation())
-                .bounds(x + 70, y + 142, 60, 16).build();
+                .bounds(x + 70, y + 135, 60, 16).build();
         tooltip.setTooltip(Tooltip.create(Component.literal("Add tooltip lines to an item everywhere (not just this recipe's output), mark items as unobtainable, or hide them from JEI/EMI")));
         addRenderableWidget(tooltip);
         Button browse = Button.builder(Component.literal("Recipes..."), b -> openBrowser())
-                .bounds(x + 132, y + 142, 60, 16).build();
+                .bounds(x + 132, y + 135, 60, 16).build();
         browse.setTooltip(Tooltip.create(Component.literal("Find existing recipes to edit, remove or restore")));
         addRenderableWidget(browse);
     }
@@ -200,22 +200,22 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
         Machine.Kind kind = state.machine.kind();
         switch (kind) {
             case SHAPED, SHAPELESS -> {
-                for (int i = 0; i < 9; i++) ghostSlots.add(new GhostSlot(false, i, 30 + (i % 3) * 18, 42 + (i / 3) * 18, 18));
-                ghostSlots.add(new GhostSlot(true, 0, 126, 56, 26));
+                for (int i = 0; i < 9; i++) ghostSlots.add(new GhostSlot(false, i, 30 + (i % 3) * 18, 38 + (i / 3) * 18, 18));
+                ghostSlots.add(new GhostSlot(true, 0, 126, 52, 26));
             }
             case SMITHING -> {
-                for (int i = 0; i < 3; i++) ghostSlots.add(new GhostSlot(false, i, 16 + i * 18, 60, 18));
-                ghostSlots.add(new GhostSlot(true, 0, 112, 56, 26));
+                for (int i = 0; i < 3; i++) ghostSlots.add(new GhostSlot(false, i, 16 + i * 18, 56, 18));
+                ghostSlots.add(new GhostSlot(true, 0, 112, 52, 26));
             }
             case TEMPLATE -> {
                 for (int i = 0; i < Math.min(MAX_TEMPLATE_INPUTS, state.inputs.length); i++)
-                    ghostSlots.add(new GhostSlot(false, i, 8 + (i % 6) * 18, 42 + (i / 6) * 18, 18));
+                    ghostSlots.add(new GhostSlot(false, i, 8 + (i % 6) * 18, 38 + (i / 6) * 18, 18));
                 for (int i = 0; i < Math.min(MAX_TEMPLATE_OUTPUTS, state.outputs.length); i++)
-                    ghostSlots.add(new GhostSlot(true, i, 150 + (i % 2) * 18, 42 + (i / 2) * 18, 18));
+                    ghostSlots.add(new GhostSlot(true, i, 150 + (i % 2) * 18, 38 + (i / 2) * 18, 18));
             }
             default -> { // single input machines
-                ghostSlots.add(new GhostSlot(false, 0, 40, 60, 18));
-                ghostSlots.add(new GhostSlot(true, 0, 102, 56, 26));
+                ghostSlots.add(new GhostSlot(false, 0, 40, 56, 18));
+                ghostSlots.add(new GhostSlot(true, 0, 102, 52, 26));
             }
         }
     }
@@ -242,13 +242,13 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
             List<net.minecraft.util.FormattedCharSequence> lines = font.split(Component.literal(
                     state.templateError == null ? "No template" : state.templateError), imageWidth - 16);
             for (int i = 0; i < Math.min(5, lines.size()); i++) {
-                g.drawString(font, lines.get(i), leftPos + 8, topPos + 42 + i * 10, 0xFFAA0000, false);
+                g.drawString(font, lines.get(i), leftPos + 8, topPos + 38 + i * 10, 0xFFAA0000, false);
             }
             return;
         }
-        UiDraw.arrow(g, leftPos + arrowX(), topPos + (kind == Machine.Kind.TEMPLATE ? 52 : 61));
+        UiDraw.arrow(g, leftPos + arrowX(), topPos + (kind == Machine.Kind.TEMPLATE ? 48 : 57));
         if (kind.cooking()) {
-            UiDraw.flame(g, leftPos + 42, topPos + 80);
+            UiDraw.flame(g, leftPos + 42, topPos + 76);
         }
         for (GhostSlot s : ghostSlots) {
             UiDraw.slot(g, leftPos + s.x(), topPos + s.y(), s.size());
@@ -270,10 +270,10 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
         }
         if (kind == Machine.Kind.TEMPLATE) {
             if (state.inputs.length > MAX_TEMPLATE_INPUTS) {
-                g.drawString(font, "+" + (state.inputs.length - MAX_TEMPLATE_INPUTS) + " more", leftPos + 8, topPos + 96, 0xFF404040, false);
+                g.drawString(font, "+" + (state.inputs.length - MAX_TEMPLATE_INPUTS) + " more", leftPos + 8, topPos + 92, 0xFF404040, false);
             }
             if (state.outputs.length > MAX_TEMPLATE_OUTPUTS) {
-                g.drawString(font, "+" + (state.outputs.length - MAX_TEMPLATE_OUTPUTS), leftPos + 150, topPos + 78, 0xFF404040, false);
+                g.drawString(font, "+" + (state.outputs.length - MAX_TEMPLATE_OUTPUTS), leftPos + 150, topPos + 74, 0xFF404040, false);
             }
         }
     }
@@ -288,14 +288,14 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
         Machine machine = state.machine;
         if (machine.isTemplate() && machine.examples().size() > 1) {
             String label = (state.exampleIndex + 1) + "/" + machine.examples().size();
-            g.drawString(font, label, 167 - font.width(label) / 2, 21, 0xFF404040, false);
+            g.drawString(font, label, 161 - font.width(label) / 2, 20, 0xFF404040, false);
         }
         if (machine.kind().cooking()) {
-            g.drawString(font, "Time", 150, 42, 0xFF404040, false);
-            g.drawString(font, "XP", 150, 72, 0xFF404040, false);
+            g.drawString(font, "Time", 150, 38, 0xFF404040, false);
+            g.drawString(font, "XP", 150, 66, 0xFF404040, false);
         }
         if (machine.kind() == Machine.Kind.SHAPELESS) {
-            g.drawString(font, "any order", 30, 97, 0xFF707070, false);
+            g.drawString(font, "any order", 118, 82, 0xFF707070, false);
         }
     }
 
@@ -545,6 +545,16 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
         cursor = ItemStack.EMPTY;
         selectedOutput = 0;
         rebuildWidgets();
+    }
+
+    /** Called when a template requested from the server arrives. */
+    public void onTemplateReceived(ResourceLocation id) {
+        Machine machine = state.machine;
+        if (machine.isTemplate() && state.template == null && !machine.examples().isEmpty()
+                && machine.examples().get(Math.floorMod(state.exampleIndex, machine.examples().size())).id().equals(id)) {
+            RecipeFactory.loadExample(state, state.exampleIndex, registries());
+            rebuildWidgets();
+        }
     }
 
     /** Loads loose items when a recipe viewer shows something that isn't a real recipe. */

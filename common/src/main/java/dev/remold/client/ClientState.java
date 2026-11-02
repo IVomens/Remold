@@ -45,5 +45,6 @@ public final class ClientState {
         annotations = Map.of();
         changes = List.of();
         pendingApply = false;
+        dev.remold.core.TemplateCache.clear();
     }
 }

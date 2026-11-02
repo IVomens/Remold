@@ -44,11 +44,14 @@ public class RemoldNeoForge {
                 (p, ctx) -> ServerActions.handleAction((ServerPlayer) ctx.player(), p));
         registrar.playToServer(Payloads.SetAnnotation.TYPE, Payloads.SetAnnotation.CODEC,
                 (p, ctx) -> ServerActions.handleAnnotation((ServerPlayer) ctx.player(), p));
+        registrar.playToServer(Payloads.RequestTemplate.TYPE, Payloads.RequestTemplate.CODEC,
+                (p, ctx) -> ServerActions.handleTemplateRequest((ServerPlayer) ctx.player(), p));
 
         // Client handlers live in RemoldClient; the lambdas are only invoked on the client.
         registrar.playToClient(Payloads.OpenEditor.TYPE, Payloads.OpenEditor.CODEC, (p, ctx) -> RemoldClient.handle(p));
         registrar.playToClient(Payloads.SyncAnnotations.TYPE, Payloads.SyncAnnotations.CODEC, (p, ctx) -> RemoldClient.handle(p));
         registrar.playToClient(Payloads.SyncChanges.TYPE, Payloads.SyncChanges.CODEC, (p, ctx) -> RemoldClient.handle(p));
+        registrar.playToClient(Payloads.TemplateJson.TYPE, Payloads.TemplateJson.CODEC, (p, ctx) -> RemoldClient.handle(p));
         registrar.playToClient(Payloads.Notice.TYPE, Payloads.Notice.CODEC, (p, ctx) -> RemoldClient.handle(p));
     }
 }
