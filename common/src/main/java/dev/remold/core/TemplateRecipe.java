@@ -1,0 +1,314 @@
+package dev.remold.core;
+
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonPrimitive;
+import com.mojang.serialization.DataResult;
+import com.mojang.serialization.JsonOps;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.component.DataComponentPatch;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.world.item.crafting.RecipeHolder;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * The trick that makes Remold work with machines from any mod, without per-mod code.
+ * <p>
+ * Every recipe in 1.21 can be turned into JSON with its own codec. We take an existing recipe of
+ * the chosen machine, encode it, and scan the JSON for anything that looks like an item
+ * (ingredients: {@code {"item": ...}} / {@code {"tag": ...}}, stacks: {@code {"id": ..., "count": n}}).
+ * Those become editor slots; every other number/string/boolean (processing time, energy, fluid
+ * amounts, ...) becomes an editable parameter. Saving writes the edited copy back through the
+ * same codec, so the mod itself validates the result.
+ */
+public final class TemplateRecipe {
+    public enum NodeStyle { INGREDIENT_ITEM, INGREDIENT_TAG, STACK_ID, STACK_ITEM, PLAIN_STRING }
+
+    public record Node(List<Object> path, NodeStyle style, boolean output) {}
+
+    public record Param(List<Object> path, JsonPrimitive original) {
+        public String label() {
+            StringBuilder sb = new StringBuilder();
+            for (Object o : path) {
+                if (o instanceof Integer i) sb.append('[').append(i + 1).append(']');
+                else {
+                    if (!sb.isEmpty()) sb.append('.');
+                    sb.append(o);
+                }
+            }
+            return sb.toString();
+        }
+    }
+
+    private static final Set<String> SKIPPED_KEYS = Set.of("type", "neoforge:conditions", "fabric:load_conditions", "conditions");
+
+    public final ResourceLocation sourceId;
+    public final JsonObject json;
+    public final List<Node> inputs = new ArrayList<>();
+    public final List<Node> outputs = new ArrayList<>();
+    public final List<Param> params = new ArrayList<>();
+
+    private TemplateRecipe(ResourceLocation sourceId, JsonObject json) {
+        this.sourceId = sourceId;
+        this.json = json;
+        walk(json, new ArrayList<>(), false);
+    }
+
+    public static DataResult<TemplateRecipe> of(RecipeHolder<?> holder, HolderLookup.Provider registries) {
+        return Recipe.CODEC.encodeStart(registries.createSerializationContext(JsonOps.INSTANCE), holder.value())
+                .flatMap(json -> json.isJsonObject()
+                        ? DataResult.success(new TemplateRecipe(holder.id(), json.getAsJsonObject()))
+                        : DataResult.error(() -> "Recipe is not a JSON object"));
+    }
+
+    // ------------------------------------------------------------------ scanning
+
+    private static boolean isItem(JsonElement e) {
+        if (!e.isJsonPrimitive() || !e.getAsJsonPrimitive().isString()) return false;
+        ResourceLocation id = ResourceLocation.tryParse(e.getAsString());
+        return id != null && BuiltInRegistries.ITEM.containsKey(id) && BuiltInRegistries.ITEM.get(id) != Items.AIR;
+    }
+
+    private static boolean outputKey(String key) {
+        String k = key.toLowerCase(Locale.ROOT);
+        return k.contains("result") || k.contains("output") || k.contains("product");
+    }
+
+    private void walk(JsonElement element, List<Object> path, boolean inOutput) {
+        if (element.isJsonArray()) {
+            JsonArray array = element.getAsJsonArray();
+            for (int i = 0; i < array.size(); i++) {
+                walkChild(array.get(i), append(path, i), inOutput, null);
+            }
+        } else if (element.isJsonObject()) {
+            JsonObject obj = element.getAsJsonObject();
+            for (Map.Entry<String, JsonElement> entry : obj.entrySet()) {
+                if (SKIPPED_KEYS.contains(entry.getKey())) continue;
+                walkChild(entry.getValue(), append(path, entry.getKey()), inOutput || outputKey(entry.getKey()), entry.getKey());
+            }
+        }
+    }
+
+    private void walkChild(JsonElement child, List<Object> path, boolean inOutput, String key) {
+        if (child.isJsonObject()) {
+            JsonObject obj = child.getAsJsonObject();
+            if (obj.has("item") && isItem(obj.get("item"))) {
+                add(new Node(path, inOutput ? NodeStyle.STACK_ITEM : NodeStyle.INGREDIENT_ITEM, inOutput));
+                paramsOf(obj, path, inOutput ? Set.of("item", "count") : Set.of("item"));
+                return;
+            }
+            if (obj.has("tag") && obj.get("tag").isJsonPrimitive() && !inOutput) {
+                add(new Node(path, NodeStyle.INGREDIENT_TAG, false));
+                paramsOf(obj, path, Set.of("tag"));
+                return;
+            }
+            if (obj.has("id") && isItem(obj.get("id"))) {
+                boolean output = inOutput || !inputHint(path);
+                add(new Node(path, NodeStyle.STACK_ID, output));
+                paramsOf(obj, path, output ? Set.of("id", "components", "count") : Set.of("id", "components"));
+                return;
+            }
+            walk(obj, path, inOutput);
+        } else if (child.isJsonArray()) {
+            walk(child, path, inOutput);
+        } else if (child.isJsonPrimitive()) {
+            JsonPrimitive p = child.getAsJsonPrimitive();
+            if (isItem(p) && (inOutput || inputHint(path))) {
+                add(new Node(path, NodeStyle.PLAIN_STRING, inOutput));
+            } else if (key == null || !SKIPPED_KEYS.contains(key)) {
+                params.add(new Param(path, p));
+            }
+        }
+    }
+
+    private void paramsOf(JsonObject obj, List<Object> path, Set<String> skip) {
+        for (Map.Entry<String, JsonElement> e : obj.entrySet()) {
+            if (!skip.contains(e.getKey()) && !SKIPPED_KEYS.contains(e.getKey()) && e.getValue().isJsonPrimitive()) {
+                params.add(new Param(append(path, e.getKey()), e.getValue().getAsJsonPrimitive()));
+            }
+        }
+    }
+
+    private static boolean inputHint(List<Object> path) {
+        for (Object o : path) {
+            if (o instanceof String s) {
+                String k = s.toLowerCase(Locale.ROOT);
+                if (k.contains("ingredient") || k.contains("input") || k.contains("key") || k.contains("base")
+                        || k.contains("addition") || k.contains("template") || k.contains("catalyst")) return true;
+            }
+        }
+        return false;
+    }
+
+    private void add(Node node) {
+        (node.output() ? outputs : inputs).add(node);
+    }
+
+    private static List<Object> append(List<Object> path, Object next) {
+        List<Object> copy = new ArrayList<>(path);
+        copy.add(next);
+        return copy;
+    }
+
+    // ------------------------------------------------------------------ reading values
+
+    public GhostIngredient initialInput(Node node) {
+        JsonElement e = get(json, node.path());
+        if (node.style() == NodeStyle.INGREDIENT_TAG) {
+            TagKey<Item> tag = TagKey.create(Registries.ITEM, ResourceLocation.parse(e.getAsJsonObject().get("tag").getAsString()));
+            ItemStack first = GhostIngredient.tagItems(tag).stream().findFirst().map(ItemStack::new).orElse(new ItemStack(Items.BARRIER));
+            return new GhostIngredient(first, tag);
+        }
+        return GhostIngredient.of(stackOf(e, node.style()));
+    }
+
+    public ItemStack initialOutput(Node node, HolderLookup.Provider registries) {
+        JsonElement e = get(json, node.path());
+        ItemStack stack = stackOf(e, node.style());
+        if (node.style() == NodeStyle.STACK_ID && e.getAsJsonObject().has("components")) {
+            DataComponentPatch.CODEC.parse(registries.createSerializationContext(JsonOps.INSTANCE), e.getAsJsonObject().get("components"))
+                    .result().ifPresent(stack::applyComponents);
+        }
+        return stack;
+    }
+
+    private static ItemStack stackOf(JsonElement e, NodeStyle style) {
+        String id = switch (style) {
+            case PLAIN_STRING -> e.getAsString();
+            case STACK_ID -> e.getAsJsonObject().get("id").getAsString();
+            default -> e.getAsJsonObject().get("item").getAsString();
+        };
+        int count = 1;
+        if (e.isJsonObject() && e.getAsJsonObject().has("count") && e.getAsJsonObject().get("count").isJsonPrimitive()) {
+            count = Math.max(1, e.getAsJsonObject().get("count").getAsInt());
+        }
+        return new ItemStack(BuiltInRegistries.ITEM.get(ResourceLocation.parse(id)), count);
+    }
+
+    // ------------------------------------------------------------------ building
+
+    /**
+     * Builds a new recipe JSON from this template.
+     *
+     * @param inputs      one ghost per {@link #inputs} node; empty ghosts inside lists are removed
+     * @param outputs     one stack per {@link #outputs} node
+     * @param paramValues one string per {@link #params} entry
+     */
+    public DataResult<JsonObject> build(GhostIngredient[] inputs, ItemStack[] outputs, String[] paramValues, HolderLookup.Provider registries) {
+        JsonObject copy = json.deepCopy();
+        List<List<Object>> removals = new ArrayList<>();
+
+        for (int i = 0; i < this.params.size(); i++) {
+            Param param = this.params.get(i);
+            String raw = paramValues[i];
+            JsonPrimitive value;
+            JsonPrimitive original = param.original();
+            try {
+                if (original.isBoolean()) value = new JsonPrimitive(Boolean.parseBoolean(raw.trim()));
+                else if (original.isNumber()) {
+                    String t = raw.trim();
+                    value = t.contains(".") || t.contains("e") ? new JsonPrimitive(Double.parseDouble(t)) : new JsonPrimitive(Long.parseLong(t));
+                } else value = new JsonPrimitive(raw);
+            } catch (NumberFormatException e) {
+                return DataResult.error(() -> "'" + param.label() + "' must be a number");
+            }
+            set(copy, param.path(), value);
+        }
+
+        for (int i = 0; i < this.inputs.size(); i++) {
+            Node node = this.inputs.get(i);
+            GhostIngredient ghost = inputs[i];
+            if (ghost.isEmpty()) {
+                if (node.path().getLast() instanceof Integer) {
+                    removals.add(node.path());
+                    continue;
+                }
+                int slot = i + 1;
+                return DataResult.error(() -> "Input slot " + slot + " cannot be empty for this machine");
+            }
+            String itemId = BuiltInRegistries.ITEM.getKey(ghost.stack().getItem()).toString();
+            if (node.style() == NodeStyle.PLAIN_STRING) {
+                set(copy, node.path(), new JsonPrimitive(itemId));
+                continue;
+            }
+            JsonObject obj = get(copy, node.path()).getAsJsonObject();
+            if (node.style() == NodeStyle.STACK_ID) {
+                obj.addProperty("id", itemId);
+                continue;
+            }
+            obj.remove("item");
+            obj.remove("tag");
+            if (ghost.tag() != null) obj.addProperty("tag", ghost.tag().location().toString());
+            else obj.addProperty("item", itemId);
+        }
+
+        for (int i = 0; i < this.outputs.size(); i++) {
+            Node node = this.outputs.get(i);
+            ItemStack stack = outputs[i];
+            if (stack.isEmpty()) {
+                if (node.path().getLast() instanceof Integer) {
+                    removals.add(node.path());
+                    continue;
+                }
+                return DataResult.error(() -> "The output cannot be empty");
+            }
+            String itemId = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
+            if (node.style() == NodeStyle.PLAIN_STRING) {
+                set(copy, node.path(), new JsonPrimitive(itemId));
+                continue;
+            }
+            JsonObject obj = get(copy, node.path()).getAsJsonObject();
+            obj.addProperty(node.style() == NodeStyle.STACK_ID ? "id" : "item", itemId);
+            if (stack.getCount() != 1 || obj.has("count")) obj.addProperty("count", stack.getCount());
+            if (node.style() == NodeStyle.STACK_ID) {
+                DataComponentPatch patch = stack.getComponentsPatch();
+                if (patch.isEmpty()) {
+                    obj.remove("components");
+                } else {
+                    DataResult<JsonElement> components = DataComponentPatch.CODEC.encodeStart(registries.createSerializationContext(JsonOps.INSTANCE), patch);
+                    if (components.error().isPresent()) return DataResult.error(() -> "Bad item data: " + components.error().get().message());
+                    obj.add("components", components.getOrThrow());
+                }
+            }
+        }
+
+        // Remove emptied list entries back to front so indices stay valid.
+        removals.sort(Comparator.comparing((List<Object> p) -> (Integer) p.getLast()).reversed());
+        for (List<Object> path : removals) {
+            JsonElement parent = get(copy, path.subList(0, path.size() - 1));
+            if (parent.isJsonArray()) parent.getAsJsonArray().remove((int) (Integer) path.getLast());
+        }
+        return DataResult.success(copy);
+    }
+
+    // ------------------------------------------------------------------ json paths
+
+    static JsonElement get(JsonElement root, List<Object> path) {
+        JsonElement e = root;
+        for (Object o : path) {
+            e = o instanceof Integer i ? e.getAsJsonArray().get(i) : e.getAsJsonObject().get((String) o);
+        }
+        return e;
+    }
+
+    static void set(JsonElement root, List<Object> path, JsonElement value) {
+        JsonElement parent = get(root, path.subList(0, path.size() - 1));
+        Object last = path.getLast();
+        if (last instanceof Integer i) parent.getAsJsonArray().set(i, value);
+        else parent.getAsJsonObject().add((String) last, value);
+    }
+}

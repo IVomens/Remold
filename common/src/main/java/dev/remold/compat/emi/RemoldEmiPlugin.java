@@ -1,0 +1,78 @@
+package dev.remold.compat.emi;
+
+import dev.remold.client.ClientState;
+import dev.remold.client.screen.EditorScreen;
+import dev.remold.compat.ViewerBridge;
+import dev.emi.emi.api.EmiApi;
+import dev.emi.emi.api.EmiEntrypoint;
+import dev.emi.emi.api.EmiPlugin;
+import dev.emi.emi.api.EmiRegistry;
+import dev.emi.emi.api.stack.EmiIngredient;
+import dev.emi.emi.api.stack.EmiStack;
+import dev.emi.emi.api.stack.EmiStackInteraction;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ItemStack;
+
+/**
+ * EMI integration: drag items from EMI onto the editor, R / U over editor slots, machine icons
+ * from EMI workstations, and hiding items marked "hide from viewers". EMI re-runs plugins whenever
+ * recipes reload, which Remold triggers after every change, so hidden items stay up to date.
+ */
+@EmiEntrypoint
+public class RemoldEmiPlugin implements EmiPlugin {
+    private static boolean lookupRegistered;
+
+    @Override
+    public void register(EmiRegistry registry) {
+        if (!lookupRegistered) {
+            lookupRegistered = true;
+            ViewerBridge.addCatalystLookup(RemoldEmiPlugin::workstation);
+        }
+
+        registry.addDragDropHandler(EditorScreen.class, (screen, ingredient, x, y) -> {
+            ItemStack stack = first(ingredient);
+            if (stack.isEmpty()) return false;
+            for (EditorScreen.DropTarget target : screen.dropTargets()) {
+                if (target.area().contains(x, y)) {
+                    target.accept().accept(stack);
+                    return true;
+                }
+            }
+            return false;
+        });
+
+        registry.addStackProvider(EditorScreen.class, (screen, x, y) -> {
+            ItemStack stack = screen.ghostStackAt(x, y);
+            return stack.isEmpty() ? EmiStackInteraction.EMPTY : new EmiStackInteraction(EmiStack.of(stack));
+        });
+
+        registry.removeEmiStacks(stack -> {
+            ItemStack item = stack.getItemStack();
+            if (item.isEmpty()) return false;
+            var annotation = ClientState.annotations().get(BuiltInRegistries.ITEM.getKey(item.getItem()));
+            return annotation != null && annotation.hideFromViewers();
+        });
+    }
+
+    private static ItemStack first(EmiIngredient ingredient) {
+        for (EmiStack stack : ingredient.getEmiStacks()) {
+            ItemStack item = stack.getItemStack();
+            if (!item.isEmpty()) return item.copyWithCount(1);
+        }
+        return ItemStack.EMPTY;
+    }
+
+    private static ItemStack workstation(ResourceLocation recipeType) {
+        var manager = EmiApi.getRecipeManager();
+        for (var category : manager.getCategories()) {
+            if (category.getId().equals(recipeType)) {
+                for (EmiIngredient workstation : manager.getWorkstations(category)) {
+                    ItemStack stack = first(workstation);
+                    if (!stack.isEmpty()) return stack;
+                }
+            }
+        }
+        return ItemStack.EMPTY;
+    }
+}
