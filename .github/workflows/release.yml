@@ -1,0 +1,66 @@
+name: Release
+
+# Push a version tag to publish a release, e.g.:
+#   git tag v0.1.0-beta.1 && git push origin v0.1.0-beta.1
+# The version comes from the tag (without the leading "v"). Tags with a "-" (beta, alpha, rc)
+# become pre-releases. Release notes are the matching "## <version>" section of CHANGELOG.md.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version
+        id: version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "mc=$(grep '^minecraft_version=' gradle.properties | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+          if [[ "$version" == *-* ]]; then echo "prerelease=true" >> "$GITHUB_OUTPUT"; else echo "prerelease=false" >> "$GITHUB_OUTPUT"; fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build
+        run: ./gradlew build -Pmod_version=${{ steps.version.outputs.version }}
+
+      - name: Collect jars
+        run: |
+          mkdir dist
+          cp neoforge/build/libs/*.jar fabric/build/libs/*.jar dist/
+          rm -f dist/*-sources.jar
+          ls -l dist
+
+      - name: Release notes
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          awk -v v="## $VERSION" '$0 == v {found=1; next} found && /^## / {exit} found {print}' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then echo "Remold $VERSION" > notes.md; fi
+          cat notes.md
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          MC: ${{ steps.version.outputs.mc }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          flags=""
+          if [ "$PRERELEASE" = "true" ]; then flags="--prerelease"; fi
+          gh release create "$GITHUB_REF_NAME" dist/*.jar $flags \
+            --title "Remold $VERSION for Minecraft $MC" \
+            --notes-file notes.md

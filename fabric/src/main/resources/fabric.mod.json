@@ -21,7 +21,7 @@
   },
   "mixins": ["remold.mixins.json", "remold.common.mixins.json"],
   "depends": {
-    "fabricloader": ">=${fabric_loader_version}",
+    "fabricloader": ">=0.16.0",
     "fabric-api": "*",
     "minecraft": "~${minecraft_version}"
   },
