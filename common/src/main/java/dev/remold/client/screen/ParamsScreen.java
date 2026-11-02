@@ -13,7 +13,6 @@ import net.minecraft.network.chat.Component;
 
 import java.util.List;
 
-/** Every non-item value of a machine recipe (processing time, energy, chance, fluid, ...). */
 public class ParamsScreen extends Screen {
     private final EditorScreen editor;
     private int page;

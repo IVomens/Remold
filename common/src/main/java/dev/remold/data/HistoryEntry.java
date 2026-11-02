@@ -6,22 +6,10 @@ import net.minecraft.resources.ResourceLocation;
 
 import java.util.Optional;
 
-/**
- * What something looked like before Remold changed it, so the change can be undone.
- * All entries with the same {@code batch} were one operator action and are undone together.
- *
- * @param previousFile       the recipe file's previous content (absent: there was no file)
- * @param previousChange     the previous manifest entry
- * @param previousAnnotation the previous item annotation (only for annotation entries)
- * @param tag                true for tag entries: {@code id} is the tag and {@code previousFile} its tag file
- * @param previousTagEdit    the previous tag edit (only for tag entries)
- * @param configFile         for settings files in the pack (e.g. unification): the file name; previousFile is its content
- */
 public record HistoryEntry(long batch, boolean annotation, ResourceLocation id,
                            Optional<String> previousFile, Optional<ChangeEntry> previousChange,
                            Optional<Annotation> previousAnnotation, String author, long time,
                            boolean tag, Optional<TagEdit> previousTagEdit, Optional<String> configFile) {
-
     public static final Codec<HistoryEntry> CODEC = RecordCodecBuilder.create(i -> i.group(
             Codec.LONG.fieldOf("batch").forGetter(HistoryEntry::batch),
             Codec.BOOL.optionalFieldOf("annotation", false).forGetter(HistoryEntry::annotation),

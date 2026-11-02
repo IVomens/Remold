@@ -9,14 +9,13 @@ import net.minecraft.resources.ResourceLocation;
 import java.util.List;
 import java.util.Map;
 
-/** Data the server has sent us, plus the operator's current draft. */
 public final class ClientState {
     private static Map<ResourceLocation, Annotation> annotations = Map.of();
     private static List<ChangeEntry> changes = List.of();
     private static boolean pendingApply;
     private static int permissionLevel = dev.remold.Remold.PERMISSION_LEVEL;
     private static boolean listed;
-    /** The draft survives closing and re-opening the editor. */
+
     public static final EditorState EDITOR = new EditorState();
 
     private ClientState() {}
@@ -51,7 +50,6 @@ public final class ClientState {
         return gates;
     }
 
-    /** The requirement locking this recipe, or null if it isn't locked. */
     @org.jetbrains.annotations.Nullable
     public static String gate(ResourceLocation recipe) {
         return gates.get(recipe);

@@ -26,16 +26,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * The trick that makes Remold work with machines from any mod, without per-mod code.
- * <p>
- * Every recipe in 1.21 can be turned into JSON with its own codec. We take an existing recipe of
- * the chosen machine, encode it, and scan the JSON for anything that looks like an item
- * (ingredients: {@code {"item": ...}} / {@code {"tag": ...}}, stacks: {@code {"id": ..., "count": n}}).
- * Those become editor slots; every other number/string/boolean (processing time, energy, fluid
- * amounts, ...) becomes an editable parameter. Saving writes the edited copy back through the
- * same codec, so the mod itself validates the result.
- */
 public final class TemplateRecipe {
     public enum NodeStyle { INGREDIENT_ITEM, INGREDIENT_TAG, STACK_ID, STACK_ITEM, PLAIN_STRING }
 
@@ -79,8 +69,6 @@ public final class TemplateRecipe {
     public static TemplateRecipe of(ResourceLocation id, JsonObject json) {
         return new TemplateRecipe(id, json);
     }
-
-    // ------------------------------------------------------------------ scanning
 
     private static boolean isItem(JsonElement e) {
         if (!e.isJsonPrimitive() || !e.getAsJsonPrimitive().isString()) return false;
@@ -169,8 +157,6 @@ public final class TemplateRecipe {
         return copy;
     }
 
-    // ------------------------------------------------------------------ reading values
-
     public GhostIngredient initialInput(Node node) {
         JsonElement e = get(json, node.path());
         if (node.style() == NodeStyle.INGREDIENT_TAG) {
@@ -204,15 +190,6 @@ public final class TemplateRecipe {
         return new ItemStack(BuiltInRegistries.ITEM.get(ResourceLocation.parse(id)), count);
     }
 
-    // ------------------------------------------------------------------ building
-
-    /**
-     * Builds a new recipe JSON from this template.
-     *
-     * @param inputs      one ghost per {@link #inputs} node; empty ghosts inside lists are removed
-     * @param outputs     one stack per {@link #outputs} node
-     * @param paramValues one string per {@link #params} entry
-     */
     public DataResult<JsonObject> build(GhostIngredient[] inputs, ItemStack[] outputs, String[] paramValues, HolderLookup.Provider registries) {
         JsonObject copy = json.deepCopy();
         List<List<Object>> removals = new ArrayList<>();
@@ -291,7 +268,6 @@ public final class TemplateRecipe {
             }
         }
 
-        // Remove emptied list entries back to front so indices stay valid.
         removals.sort(Comparator.comparing((List<Object> p) -> (Integer) p.getLast()).reversed());
         for (List<Object> path : removals) {
             JsonElement parent = get(copy, path.subList(0, path.size() - 1));
@@ -300,10 +276,6 @@ public final class TemplateRecipe {
         return DataResult.success(copy);
     }
 
-    /**
-     * A copy of this recipe with every reference to item {@code from} changed to {@code to}, or null if
-     * the recipe doesn't mention it. Tag ingredients are left alone (a tag isn't an item).
-     */
     @org.jetbrains.annotations.Nullable
     public JsonObject replaceItem(String from, String to, boolean inInputs, boolean inOutputs) {
         JsonObject copy = json.deepCopy();
@@ -331,10 +303,6 @@ public final class TemplateRecipe {
         return changed ? copy : null;
     }
 
-    /**
-     * A copy of this recipe where ingredients that ask for exactly one of {@code items} accept the
-     * whole {@code tag} instead, or null if nothing changed.
-     */
     @org.jetbrains.annotations.Nullable
     public JsonObject widenToTag(Set<String> items, String tag) {
         JsonObject copy = json.deepCopy();
@@ -350,8 +318,6 @@ public final class TemplateRecipe {
         }
         return changed ? copy : null;
     }
-
-    // ------------------------------------------------------------------ json paths
 
     static JsonElement get(JsonElement root, List<Object> path) {
         JsonElement e = root;

@@ -17,16 +17,6 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * {@code config/remold/remold.json}:
- * <pre>
- * {
- *   "permission_level": 2,          // vanilla permission level needed to edit (2 = operator)
- *   "allowed_players": ["Steve"]    // names or UUIDs that may edit even without that level
- * }
- * </pre>
- * Re-read when the server starts and on {@code /remold apply}.
- */
 public record RemoldConfig(int permissionLevel, List<String> allowedPlayers) {
     public static final RemoldConfig DEFAULT = new RemoldConfig(Remold.PERMISSION_LEVEL, List.of());
 
@@ -46,7 +36,7 @@ public record RemoldConfig(int permissionLevel, List<String> allowedPlayers) {
         try {
             if (!Files.exists(file)) {
                 Files.createDirectories(file.getParent());
-                // Written by hand: the codec leaves out default values, but server owners should see every option.
+
                 JsonObject json = new JsonObject();
                 json.addProperty("permission_level", DEFAULT.permissionLevel());
                 json.add("allowed_players", new JsonArray());
@@ -62,7 +52,6 @@ public record RemoldConfig(int permissionLevel, List<String> allowedPlayers) {
         }
     }
 
-    /** On the allow list (by name or UUID). */
     public boolean listed(ServerPlayer player) {
         String name = player.getGameProfile().getName().toLowerCase(Locale.ROOT);
         String uuid = player.getUUID().toString();

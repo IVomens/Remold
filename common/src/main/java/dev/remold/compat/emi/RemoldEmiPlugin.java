@@ -22,11 +22,6 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 
-/**
- * EMI integration: drag items from EMI onto the editor, R / U over editor slots, machine icons
- * from EMI workstations, and hiding items marked "hide from viewers". EMI re-runs plugins whenever
- * recipes reload, which Remold triggers after every change, so hidden items stay up to date.
- */
 @EmiEntrypoint
 public class RemoldEmiPlugin implements EmiPlugin {
     private static boolean lookupRegistered;
@@ -55,7 +50,6 @@ public class RemoldEmiPlugin implements EmiPlugin {
             return stack.isEmpty() ? EmiStackInteraction.EMPTY : new EmiStackInteraction(EmiStack.of(stack));
         });
 
-        // "+" button on any EMI recipe: load it into the editor.
         registry.addRecipeHandler(EditorMenu.TYPE, new EmiRecipeHandler<>() {
             @Override
             public EmiPlayerInventory getInventory(AbstractContainerScreen<EditorMenu> screen) {
@@ -84,7 +78,6 @@ public class RemoldEmiPlugin implements EmiPlugin {
             }
         });
 
-        // Padlock on locked recipes (recipe gating).
         registry.addRecipeDecorator((recipe, widgets) -> {
             var backing = recipe.getBackingRecipe();
             var id = backing != null ? backing.id() : recipe.getId();

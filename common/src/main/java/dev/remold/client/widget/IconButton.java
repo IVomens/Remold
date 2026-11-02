@@ -8,7 +8,6 @@ import net.minecraft.world.item.ItemStack;
 
 import java.util.function.Supplier;
 
-/** A button with an item icon, optionally without text (for small toolbar buttons). */
 public class IconButton extends Button {
     private final Supplier<ItemStack> icon;
     private final boolean iconOnly;
@@ -22,7 +21,6 @@ public class IconButton extends Button {
     @Override
     protected void renderWidget(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         if (iconOnly) {
-            // Render the button frame without the label.
             Component saved = getMessage();
             setMessage(Component.empty());
             super.renderWidget(g, mouseX, mouseY, partialTick);
@@ -48,7 +46,6 @@ public class IconButton extends Button {
 
     @Override
     public void renderString(GuiGraphics g, net.minecraft.client.gui.Font font, int color) {
-        // leave room for the icon on the left
         renderScrollingString(g, font, getMessage(), getX() + 20, getY(), getX() + getWidth() - 2, getY() + getHeight(), color);
     }
 

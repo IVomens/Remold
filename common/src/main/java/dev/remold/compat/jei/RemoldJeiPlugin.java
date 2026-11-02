@@ -34,16 +34,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * JEI integration:
- * <ul>
- *     <li>drag items (and tags) from JEI's item list onto the editor's slots</li>
- *     <li>the "+" button on ANY recipe in JEI loads it into the editor</li>
- *     <li>R / U over editor slots show recipes / uses</li>
- *     <li>machine icons come from JEI's catalysts</li>
- *     <li>items marked "hide from viewers" disappear from JEI live</li>
- * </ul>
- */
 @JeiPlugin
 public class RemoldJeiPlugin implements IModPlugin {
     @Nullable private static IJeiRuntime runtime;
@@ -69,7 +59,6 @@ public class RemoldJeiPlugin implements IModPlugin {
         });
     }
 
-    /** Padlock on locked crafting recipes (recipe gating). */
     @Override
     public void registerAdvanced(mezz.jei.api.registration.IAdvancedRegistration registration) {
         registration.addRecipeCategoryDecorator(mezz.jei.api.constants.RecipeTypes.CRAFTING, new mezz.jei.api.recipe.category.extensions.IRecipeCategoryDecorator<>() {
@@ -187,7 +176,7 @@ public class RemoldJeiPlugin implements IModPlugin {
                 screen.load(holder);
                 return null;
             }
-            // Not a real recipe (e.g. JEI's anvil or brewing displays): copy the items over.
+
             List<ItemStack> inputs = new ArrayList<>();
             for (IRecipeSlotView slot : slots.getSlotViews(RecipeIngredientRole.INPUT)) {
                 inputs.add(slot.getDisplayedItemStack().orElse(ItemStack.EMPTY));

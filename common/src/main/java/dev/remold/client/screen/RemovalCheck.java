@@ -11,7 +11,6 @@ import net.minecraft.world.item.crafting.RecipeHolder;
 import java.util.List;
 import java.util.Set;
 
-/** Warning lines for items that would stop being craftable if these recipes were removed. */
 final class RemovalCheck {
     private RemovalCheck() {}
 

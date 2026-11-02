@@ -33,24 +33,6 @@ import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 
-/**
- * The world-local datapack that holds everything made with Remold:
- * <pre>
- * world/datapacks/remold/
- *   pack.mcmeta
- *   remold_manifest.json      what was changed, by whom and when
- *   remold_annotations.json   item tooltips / hidden items
- *   remold_history.json       previous versions, for undo
- *   remold_tags.json          tag edits
- *   remold_unify.json         item unification settings
- *   remold_gates.json         locked recipes: recipe id -> advancement id or "stage:name"
- *   remold_stages.json        stages granted to each player
- *   data/&lt;namespace&gt;/tags/item/&lt;path&gt;.json
- *   data/&lt;namespace&gt;/recipe/&lt;path&gt;.json
- * </pre>
- * Because the result is a plain datapack, recipes keep working even if Remold is uninstalled, and
- * every mod that reads recipes (JEI, EMI, REI, machines, ...) sees them like any other recipe.
- */
 public final class RemoldPack {
     public static final String FOLDER = "remold";
     public static final String PACK_ID = "file/" + FOLDER;
@@ -117,8 +99,6 @@ public final class RemoldPack {
         return root;
     }
 
-    // ------------------------------------------------------------------ loading / saving
-
     private void load() {
         readJson(root.resolve("remold_manifest.json")).ifPresent(json ->
                 MANIFEST_CODEC.parse(JsonOps.INSTANCE, json)
@@ -145,7 +125,6 @@ public final class RemoldPack {
                     }
                 }));
 
-        // Pack-wide defaults (shipped by modpacks) first, then the world's own annotations on top.
         Path global = dev.remold.platform.Services.PLATFORM.configDir().resolve(Remold.MOD_ID).resolve("annotations.json");
         for (Path file : List.of(global, root.resolve("remold_annotations.json"))) {
             readJson(file).ifPresent(json -> ANNOTATIONS_CODEC.parse(JsonOps.INSTANCE, json)
@@ -199,9 +178,6 @@ public final class RemoldPack {
         writeJson(root.resolve("remold_history.json"), HISTORY_CODEC.encodeStart(JsonOps.INSTANCE, history).getOrThrow());
     }
 
-    // ------------------------------------------------------------------ undo
-
-    /** Starts a new undo step. Everything changed until the next call is undone together. */
     public void beginBatch(String author) {
         batch = (history.isEmpty() ? 0 : history.getLast().batch()) + 1;
         batchAuthor = author;
@@ -246,7 +222,6 @@ public final class RemoldPack {
         return unify;
     }
 
-    /** Stores the unification settings (undoable with the rest of the current batch). */
     public void setUnify(UnifySettings settings) throws IOException {
         rememberConfig(UNIFY_FILE);
         Path file = root.resolve(UNIFY_FILE);
@@ -265,7 +240,6 @@ public final class RemoldPack {
         return Map.copyOf(gates);
     }
 
-    /** Locks recipes (value: advancement id or "stage:name") or unlocks them (empty value). Undoable. */
     public void setGates(Map<ResourceLocation, String> changes) throws IOException {
         rememberConfig(GATES_FILE);
         changes.forEach((id, requirement) -> {
@@ -279,7 +253,6 @@ public final class RemoldPack {
         return java.util.Set.copyOf(stages.getOrDefault(player, java.util.Set.of()));
     }
 
-    /** Grants or revokes a stage. This is player progress, so it isn't part of Undo. */
     public boolean setStage(java.util.UUID player, String stage, boolean granted) throws IOException {
         java.util.Set<String> set = stages.computeIfAbsent(player, p -> new java.util.TreeSet<>());
         boolean changed = granted ? set.add(stage) : set.remove(stage);
@@ -294,7 +267,6 @@ public final class RemoldPack {
         return changed;
     }
 
-    /** Records a settings file's current content so the current batch can be undone. */
     private void rememberConfig(String fileName) throws IOException {
         ensurePack();
         Path file = root.resolve(fileName);
@@ -307,7 +279,6 @@ public final class RemoldPack {
 
     public record UndoResult(int changes, boolean recipes, boolean annotations, String author) {}
 
-    /** Undoes the most recent step (one save, removal, "make unobtainable", ...). */
     public Optional<UndoResult> undo() throws IOException {
         if (history.isEmpty()) return Optional.empty();
         long last = history.getLast().batch();
@@ -332,7 +303,7 @@ public final class RemoldPack {
                 continue;
             }
             if (entry.tag()) {
-                recipes = true; // tags need a reload too
+                recipes = true;
                 Path file = tagFile(entry.id());
                 if (entry.previousFile().isPresent()) {
                     Files.createDirectories(file.getParent());
@@ -379,11 +350,6 @@ public final class RemoldPack {
         return Map.copyOf(tagEdits);
     }
 
-    /**
-     * Stores the complete set of edits for one item tag and writes its tag file.
-     *
-     * @param current the tag's current contents, for loaders that can't remove entries from tags
-     */
     public void setTagEdit(ResourceLocation tag, TagEdit edit, List<String> current) throws IOException {
         ensurePack();
         rememberTag(tag);
@@ -391,8 +357,6 @@ public final class RemoldPack {
             tagEdits.remove(tag);
             Files.deleteIfExists(tagFile(tag));
         } else {
-            // "current" includes the effect of Remold's previous edit. Undo that part, so loaders that rewrite
-            // the whole tag (Fabric) restore entries that are no longer removed and drop ones no longer added.
             TagEdit previous = tagEdits.getOrDefault(tag, TagEdit.EMPTY);
             List<String> base = new ArrayList<>(current);
             for (String r : previous.remove()) if (!edit.remove().contains(r) && !r.startsWith("#") && !base.contains(r)) base.add(r);
@@ -408,8 +372,6 @@ public final class RemoldPack {
         return root.resolve("data").resolve(id.getNamespace()).resolve("recipe").resolve(id.getPath() + ".json");
     }
 
-    // ------------------------------------------------------------------ recipe changes
-
     public void writeRecipe(ResourceLocation id, JsonElement json, ChangeEntry entry) throws IOException {
         ensurePack();
         rememberRecipe(id);
@@ -419,7 +381,6 @@ public final class RemoldPack {
         pendingApply = true;
     }
 
-    /** Deletes Remold's file for this id, restoring whatever the id was before. */
     public boolean revert(ResourceLocation id) throws IOException {
         if (Files.exists(recipeFile(id)) || changes.containsKey(id)) rememberRecipe(id);
         boolean existed = Files.deleteIfExists(recipeFile(id));
@@ -443,8 +404,6 @@ public final class RemoldPack {
         return pendingApply;
     }
 
-    // ------------------------------------------------------------------ annotations
-
     public Map<ResourceLocation, Annotation> annotations() {
         return Map.copyOf(annotations);
     }
@@ -459,12 +418,6 @@ public final class RemoldPack {
         saveAnnotations();
     }
 
-    // ------------------------------------------------------------------ applying
-
-    /**
-     * Makes sure the pack is enabled (and has the highest priority) and reloads datapacks, exactly like
-     * {@code /reload}. Concurrent requests are coalesced into one extra reload.
-     */
     public CompletableFuture<Void> apply() {
         if (reloading != null && !reloading.isDone()) {
             reloadQueued = true;

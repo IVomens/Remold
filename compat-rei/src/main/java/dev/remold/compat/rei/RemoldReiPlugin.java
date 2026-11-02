@@ -26,13 +26,6 @@ import net.minecraft.world.item.ItemStack;
 
 import java.util.stream.Stream;
 
-/**
- * REI integration: drag items from REI onto the editor, machine icons from REI workstations, and
- * hiding items marked "hide from viewers" (applied whenever REI reloads, e.g. after Remold applies changes).
- * <p>
- * Compiled by each loader module (REI's API is published per loader). Fabric finds it through the
- * {@code rei_client} entrypoint; NeoForge through an annotated subclass.
- */
 public class RemoldReiPlugin implements REIClientPlugin {
     private static boolean lookupRegistered;
 
@@ -75,7 +68,6 @@ public class RemoldReiPlugin implements REIClientPlugin {
         });
     }
 
-    /** "+" button on any REI recipe: load it into the editor. */
     @Override
     public void registerTransferHandlers(TransferHandlerRegistry registry) {
         registry.register(context -> {

@@ -36,7 +36,6 @@ public class FabricPlatform implements RemoldPlatform {
 
     @Override
     public void sendToServer(CustomPacketPayload payload) {
-        // Servers without Remold don't know the channel; the editor simply won't respond there.
         if (ClientPlayNetworking.canSend(payload.type())) {
             ClientPlayNetworking.send(payload);
         }
@@ -56,8 +55,6 @@ public class FabricPlatform implements RemoldPlatform {
         if (remove.isEmpty()) {
             add.forEach(values::add);
         } else {
-            // Vanilla/Fabric tags can't remove entries, so replace the tag with its current contents
-            // minus the removed items. Removed #tags are expanded already, so only items are filtered.
             json.addProperty("replace", true);
             java.util.LinkedHashSet<String> entries = new java.util.LinkedHashSet<>(current);
             entries.addAll(add);
@@ -70,13 +67,11 @@ public class FabricPlatform implements RemoldPlatform {
 
     @Override
     public net.minecraft.world.inventory.MenuType<?> unregisteredMenuType() {
-        // Fabric API's access widener makes this constructor public.
         return new net.minecraft.world.inventory.MenuType<>((id, inventory) -> null, net.minecraft.world.flag.FeatureFlags.VANILLA_SET);
     }
 
     @Override
     public JsonObject disabledRecipeJson() {
-        // {"fabric:load_conditions": [{"condition": "fabric:not", "value": {"condition": "fabric:true"}}]}
         JsonObject alwaysTrue = new JsonObject();
         alwaysTrue.addProperty("condition", "fabric:true");
         JsonObject not = new JsonObject();

@@ -17,9 +17,7 @@ import net.minecraft.server.level.ServerPlayer;
 
 import java.util.function.BiConsumer;
 
-/** Fabric entry point: wires Fabric API events to the loader-agnostic code in {@code dev.remold}. */
 public class RemoldFabric implements ModInitializer {
-
     @Override
     public void onInitialize() {
         registerPayloads();
@@ -41,7 +39,6 @@ public class RemoldFabric implements ModInitializer {
         toServer(Payloads.ImportRequest.TYPE, Payloads.ImportRequest.CODEC, ServerActions::handleImport);
         toServer(Payloads.RequestTemplate.TYPE, Payloads.RequestTemplate.CODEC, ServerActions::handleTemplateRequest);
 
-        // Client-bound types are registered on both sides; their handlers are set in RemoldFabricClient.
         PayloadTypeRegistry.playS2C().register(Payloads.OpenEditor.TYPE, Payloads.OpenEditor.CODEC);
         PayloadTypeRegistry.playS2C().register(Payloads.SyncAnnotations.TYPE, Payloads.SyncAnnotations.CODEC);
         PayloadTypeRegistry.playS2C().register(Payloads.SyncChanges.TYPE, Payloads.SyncChanges.CODEC);

@@ -36,12 +36,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
-/**
- * Add items to or remove items from item tags, so items from different mods work in each other's
- * recipes (e.g. put a modded copper ingot into {@code #c:ingots/copper}).
- */
 public class TagEditorScreen extends Screen {
-    /** Unsaved edits, per tag. Kept while switching between tags. */
     private final Map<ResourceLocation, Draft> drafts = new HashMap<>();
     private final Screen parent;
     private String query = "";
@@ -123,7 +118,6 @@ public class TagEditorScreen extends Screen {
         refreshList();
     }
 
-    /** The search text as a new tag id, if it is a valid id for a tag that doesn't exist yet. */
     @Nullable
     private ResourceLocation newTagId() {
         String q = query.startsWith("#") ? query.substring(1) : query;
@@ -154,13 +148,11 @@ public class TagEditorScreen extends Screen {
         List<Map.Entry<ResourceLocation, Draft>> dirty = drafts.entrySet().stream().filter(e -> e.getValue().dirty).toList();
         for (int i = 0; i < dirty.size(); i++) {
             var e = dirty.get(i);
-            // Reload once, after the last tag.
+
             Services.PLATFORM.sendToServer(new Payloads.SetTag(e.getKey(), e.getValue().toEdit(), apply && i == dirty.size() - 1));
             e.getValue().dirty = false;
         }
     }
-
-    // ------------------------------------------------------------------ members grid
 
     private int gridX() {
         return half() + 5;
@@ -178,7 +170,6 @@ public class TagEditorScreen extends Screen {
         return Math.max(1, (height - 64 - gridY()) / 18);
     }
 
-    /** Members to show: the tag's current contents plus Remold's pending additions and removals. */
     private void computeShown() {
         shown.clear();
         if (selected == null) return;
@@ -217,7 +208,6 @@ public class TagEditorScreen extends Screen {
             String entry = shown.get(i);
             Draft d = draft(selected);
             if (d.add.remove(entry)) {
-                // was added by us: un-add
             } else if (!d.remove.remove(entry)) {
                 d.remove.add(entry);
             }

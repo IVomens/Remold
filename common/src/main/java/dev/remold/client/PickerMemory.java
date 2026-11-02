@@ -15,7 +15,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 
-/** Favourite and recently picked items, saved per player in {@code config/remold/picker.json}. */
 public final class PickerMemory {
     private static final int MAX_RECENT = 36;
     private static LinkedHashSet<String> favourites;

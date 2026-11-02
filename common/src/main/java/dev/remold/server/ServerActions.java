@@ -26,7 +26,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-/** Server side handling of everything an operator can do from the editor. */
 public final class ServerActions {
     private ServerActions() {}
 
@@ -40,8 +39,6 @@ public final class ServerActions {
         notice(player, false, "no_permission", "no_permission");
         return false;
     }
-
-    // ------------------------------------------------------------------ handlers
 
     public static void handleSave(ServerPlayer player, Payloads.SaveRecipe payload) {
         if (!check(player)) return;
@@ -141,7 +138,7 @@ public final class ServerActions {
     static boolean remove(ServerPlayer player, RemoldPack pack, ResourceLocation id) throws IOException {
         var existing = pack.change(id);
         if (existing.isPresent() && existing.get().kind() == ChangeEntry.Kind.ADDED) {
-            return pack.revert(id); // our own recipe: just delete it
+            return pack.revert(id);
         }
         if (existing.isEmpty() && player.server.getRecipeManager().byKey(id).isEmpty()) {
             return false;
@@ -303,13 +300,10 @@ public final class ServerActions {
         }
     }
 
-    // ------------------------------------------------------------------ helpers
-
     static ChangeEntry entry(ServerPlayer player, ResourceLocation id, ChangeEntry.Kind kind, String type) {
         return new ChangeEntry(id, kind, type, player.getGameProfile().getName(), System.currentTimeMillis());
     }
 
-    /** Applies (reloads) if asked, keeping the operator informed. {@code what} is a notice key. */
     static void finish(ServerPlayer player, boolean apply, String what, String... args) {
         MinecraftServer server = player.server;
         RemoldPack pack = RemoldPack.get(server);
@@ -331,10 +325,6 @@ public final class ServerActions {
         }));
     }
 
-    /**
-     * Sends a toast. Title and message are keys under {@code remold.notice.} (titles end in {@code .title}),
-     * so every player sees them in their own language.
-     */
     public static void notice(ServerPlayer player, boolean ok, String title, String message, String... args) {
         Services.PLATFORM.sendToPlayer(player, new Payloads.Notice(ok, "remold.notice." + title + ".title",
                 "remold.notice." + message, List.of(args)));
@@ -364,7 +354,6 @@ public final class ServerActions {
         server.getPlayerList().getPlayers().forEach(ServerActions::sendAnnotations);
     }
 
-    /** Call when a player joins. */
     public static void onLogin(ServerPlayer player) {
         sendAccess(player);
         Gates.sync(player);

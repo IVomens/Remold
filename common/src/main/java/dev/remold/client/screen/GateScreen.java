@@ -27,10 +27,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Lock a recipe behind an advancement or a stage. Locked recipes give no result in the crafting
- * table or inventory grid until the player has it, and show a padlock in JEI and EMI.
- */
 public class GateScreen extends Screen {
     enum Mode { ADVANCEMENT, STAGE, NONE }
 
@@ -105,7 +101,6 @@ public class GateScreen extends Screen {
         updateSuggestions();
     }
 
-    /** Advancements the client knows about (the ones with a display) matching what was typed. */
     private void updateSuggestions() {
         if (mode != Mode.ADVANCEMENT || minecraft.player == null) {
             suggestions = List.of();

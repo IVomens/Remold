@@ -18,10 +18,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/**
- * Recipe gating: after the crafting grid (crafting table or inventory) works out its result, clear
- * the result if the recipe is locked for this player. Runs on the server only.
- */
 @Mixin(CraftingMenu.class)
 public abstract class CraftingMenuMixin {
     @Inject(method = "slotChangedCraftingGrid", at = @At("TAIL"))

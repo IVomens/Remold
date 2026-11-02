@@ -29,7 +29,6 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.function.IntSupplier;
 
-/** Client entry points. Loader modules forward their events here. */
 public final class RemoldClient {
     private static final SystemToast.SystemToastId TOAST = new SystemToast.SystemToastId(4000L);
 
@@ -51,8 +50,6 @@ public final class RemoldClient {
         EditorScreen screen = new EditorScreen(new EditorMenu(mc.player.getInventory(), EditorScreen.INV_X, EditorScreen.INV_Y), mc.player.getInventory(), parent);
         mc.setScreen(screen);
     }
-
-    // ------------------------------------------------------------------ payloads
 
     public static void handle(Payloads.OpenEditor payload) {
         openEditor(null);
@@ -78,7 +75,6 @@ public final class RemoldClient {
         ClientState.setGates(payload.gates(), payload.unlocked());
     }
 
-    /** Tooltip lines for a recipe's lock, or an empty list if it isn't locked. */
     public static List<Component> lockTooltip(ResourceLocation recipe) {
         String requirement = ClientState.gate(recipe);
         if (requirement == null) return List.of();
@@ -87,7 +83,6 @@ public final class RemoldClient {
                 dev.remold.RemoldText.tr("gate.requires", describe(requirement)).withStyle(ChatFormatting.GRAY));
     }
 
-    /** "Stage: nether" or the advancement's title. */
     public static Component describe(String requirement) {
         if (requirement.startsWith(dev.remold.server.Gates.STAGE_PREFIX)) {
             return dev.remold.RemoldText.tr("gate.stage", requirement.substring(dev.remold.server.Gates.STAGE_PREFIX.length()));
@@ -124,9 +119,6 @@ public final class RemoldClient {
         mc.getToasts().addToast(SystemToast.multiline(mc, TOAST, t, message));
     }
 
-    // ------------------------------------------------------------------ tooltips
-
-    /** Adds operator-defined tooltip lines right below the item name. */
     public static void appendTooltip(ItemStack stack, List<Component> lines) {
         if (stack.isEmpty()) return;
         Annotation annotation = ClientState.annotations().get(BuiltInRegistries.ITEM.getKey(stack.getItem()));
@@ -137,14 +129,6 @@ public final class RemoldClient {
         }
     }
 
-    // ------------------------------------------------------------------ inventory button
-
-    /**
-     * Creates the small crafting-table button shown in the inventory of operators. Its position is
-     * recomputed every frame because the inventory moves when the recipe book is toggled.
-     *
-     * @return the widget, or null if this screen gets no button
-     */
     @Nullable
     public static AbstractWidget inventoryButton(Screen screen, IntSupplier guiLeft, IntSupplier guiTop) {
         int dx, dy, size;
@@ -170,8 +154,7 @@ public final class RemoldClient {
                 setY(guiTop.getAsInt() + dy);
                 boolean show = canEdit()
                         && !(screen instanceof CreativeModeInventoryScreen creative && !creative.isInventoryOpen());
-                // Hidden buttons stay in the widget list but are inert, because visibility can change
-                // while the screen is open (e.g. switching creative tabs, being de-opped).
+
                 active = show;
                 setTooltip(show ? tooltip : null);
                 if (show) super.renderWidget(g, mouseX, mouseY, partialTick);

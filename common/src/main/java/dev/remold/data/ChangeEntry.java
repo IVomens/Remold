@@ -10,15 +10,12 @@ import net.minecraft.util.StringRepresentable;
 
 import java.util.Locale;
 
-/** One change Remold has made to the recipe set, as recorded in the pack's manifest. */
 public record ChangeEntry(ResourceLocation id, Kind kind, String recipeType, String author, long time) {
-
     public enum Kind implements StringRepresentable {
-        /** A brand new recipe id. */
         ADDED,
-        /** A recipe that replaces an existing recipe with the same id (from vanilla or another mod). */
+
         REPLACED,
-        /** An existing recipe that has been disabled. */
+
         REMOVED;
 
         public static final Codec<Kind> CODEC = StringRepresentable.fromEnum(Kind::values);

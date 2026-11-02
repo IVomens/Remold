@@ -34,21 +34,16 @@ import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-/**
- * Imports Remold exports (or any datapack zip with recipes and item tags) from the
- * {@code remold-imports} folder next to the world. Everything in one file is one Undo step.
- */
 public final class Importer {
     public static final String FOLDER = "remold-imports";
-    private static final long MAX_ENTRY = 4L << 20;   // 4 MB per file inside the zip
-    private static final long MAX_TOTAL = 64L << 20;  // 64 MB in total
+    private static final long MAX_ENTRY = 4L << 20;
+    private static final long MAX_TOTAL = 64L << 20;
     private static final Set<String> CONDITION_KEYS = Set.of("neoforge:conditions", "fabric:load_conditions", "conditions");
     private static final Codec<Map<ResourceLocation, TagEdit>> TAGS_CODEC = Codec.unboundedMap(ResourceLocation.CODEC, TagEdit.CODEC);
     private static final Codec<Map<ResourceLocation, Annotation>> ANNOTATIONS_CODEC = Codec.unboundedMap(ResourceLocation.CODEC, Annotation.CODEC);
 
     private Importer() {}
 
-    /** What a pack contains. */
     record Contents(Map<ResourceLocation, JsonObject> recipes, Set<ResourceLocation> removals,
                     Map<ResourceLocation, TagEdit> tags, Map<ResourceLocation, Annotation> annotations) {}
 
@@ -78,7 +73,6 @@ public final class Importer {
         return result;
     }
 
-    /** Only plain file names inside the import folder are accepted. */
     private static Path resolve(MinecraftServer server, String name) throws IOException {
         if (name.isEmpty() || name.contains("/") || name.contains("\\") || name.contains("..") || !name.endsWith(".zip")) {
             throw new IOException("Invalid file name " + name);
@@ -128,7 +122,7 @@ public final class Importer {
                 }
             }
         }
-        // Remold's own record of tag edits is exact; plain tag files are the fallback.
+
         return new Contents(recipes, removals, tags != null ? tags : tagFiles, annotations);
     }
 
@@ -145,7 +139,6 @@ public final class Importer {
         return new TagEdit(add, remove);
     }
 
-    /** Applies a pack as one Undo step. */
     public static void run(ServerPlayer player, String fileName, boolean apply) {
         MinecraftServer server = player.server;
         Contents contents;
@@ -161,7 +154,6 @@ public final class Importer {
         try {
             pack.beginBatch(player.getGameProfile().getName());
             for (var e : contents.recipes().entrySet()) {
-                // Recipes for machines from mods that aren't installed here can't load; skip them.
                 if (Recipe.CODEC.parse(ops, e.getValue()).error().isPresent()) {
                     skipped++;
                     continue;

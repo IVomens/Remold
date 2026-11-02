@@ -18,10 +18,8 @@ import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
-/** NeoForge entry point: wires loader events to the loader-agnostic code in {@code dev.remold}. */
 @Mod(Remold.MOD_ID)
 public class RemoldNeoForge {
-
     public RemoldNeoForge(IEventBus modBus, Dist dist) {
         modBus.addListener(RemoldNeoForge::registerPayloads);
         NeoForge.EVENT_BUS.addListener((RegisterCommandsEvent e) -> RemoldCommands.register(e.getDispatcher()));
@@ -37,8 +35,6 @@ public class RemoldNeoForge {
     }
 
     private static void registerPayloads(RegisterPayloadHandlersEvent event) {
-        // Optional on both sides: vanilla clients can join servers with Remold (they just can't edit),
-        // and Remold clients can join servers without it.
         PayloadRegistrar registrar = event.registrar("1").optional();
 
         registrar.playToServer(Payloads.SaveRecipe.TYPE, Payloads.SaveRecipe.CODEC,
@@ -60,7 +56,6 @@ public class RemoldNeoForge {
         registrar.playToServer(Payloads.RequestTemplate.TYPE, Payloads.RequestTemplate.CODEC,
                 (p, ctx) -> ServerActions.handleTemplateRequest((ServerPlayer) ctx.player(), p));
 
-        // Client handlers live in RemoldClient; the lambdas are only invoked on the client.
         registrar.playToClient(Payloads.OpenEditor.TYPE, Payloads.OpenEditor.CODEC, (p, ctx) -> RemoldClient.handle(p));
         registrar.playToClient(Payloads.SyncAnnotations.TYPE, Payloads.SyncAnnotations.CODEC, (p, ctx) -> RemoldClient.handle(p));
         registrar.playToClient(Payloads.SyncChanges.TYPE, Payloads.SyncChanges.CODEC, (p, ctx) -> RemoldClient.handle(p));

@@ -34,7 +34,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-/** Search all recipes (from every mod), and edit, remove or restore them. */
 public class RecipeBrowserScreen extends Screen {
     private final EditorScreen editor;
     private String query;
@@ -52,12 +51,10 @@ public class RecipeBrowserScreen extends Screen {
         this.query = query;
     }
 
-    /** What the search box matches. */
     enum Mode { ALL, MAKES, USES }
 
     private Mode mode = Mode.ALL;
 
-    /** Opens the browser listing every recipe that uses {@code item} as an ingredient. */
     public static RecipeBrowserScreen usesOf(EditorScreen editor, ItemStack item) {
         RecipeBrowserScreen screen = new RecipeBrowserScreen(editor, BuiltInRegistries.ITEM.getKey(item.getItem()).toString());
         screen.mode = Mode.USES;
@@ -132,7 +129,6 @@ public class RecipeBrowserScreen extends Screen {
         rebuildWidgets();
     }
 
-    /** Items whose id or name matches the search (an exact id matches only that item). */
     private Set<Item> matchingItems(String q) {
         ResourceLocation exact = ResourceLocation.tryParse(q);
         if (exact != null && q.contains(":") && BuiltInRegistries.ITEM.containsKey(exact)) {
@@ -163,7 +159,7 @@ public class RecipeBrowserScreen extends Screen {
             ResourceLocation type = BuiltInRegistries.RECIPE_TYPE.getKey(h.value().getType());
             rows.add(new Row(h.id(), h, result.isEmpty() ? new ItemStack(Items.PAPER) : result, String.valueOf(type), changes.remove(h.id())));
         }
-        // Removed recipes are no longer loaded, but must stay visible so they can be restored.
+
         for (ChangeEntry c : changes.values()) {
             rows.add(new Row(c.id(), null, new ItemStack(Items.BARRIER), c.recipeType(), c));
         }
@@ -225,7 +221,7 @@ public class RecipeBrowserScreen extends Screen {
     public void tick() {
         super.tick();
         undo.active = ClientState.canUndo();
-        // Rows change once the server has reloaded; refresh when the data we're based on changes.
+
         int hash = ClientState.changes().hashCode() ^ System.identityHashCode(minecraft.level.getRecipeManager().getRecipes());
         if (hash != lastHash) {
             lastHash = hash;

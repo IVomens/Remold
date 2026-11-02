@@ -4,7 +4,6 @@ plugins {
 
 base { archivesName = "${mod_id}-fabric" }
 
-// The Fabric jar contains the common code compiled in, plus the REI plugin.
 def common = project(':common')
 sourceSets.main.java.srcDir common.file('src/main/java')
 sourceSets.main.resources.srcDir common.file('src/main/resources')
@@ -32,17 +31,13 @@ dependencies {
     modImplementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
     modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
 
-    // Remold only uses JEI's common API, which is published with Mojang names: no remapping needed.
     compileOnly "mezz.jei:jei-${minecraft_version}-common-api:${jei_version}"
     modCompileOnly "dev.emi:emi-fabric:${emi_version}:api"
     modCompileOnly "me.shedaniel:RoughlyEnoughItems-api-fabric:${rei_version}"
 
-    // Recipe viewer in the dev client: REI (swap for JEI or EMI to test those).
     modLocalRuntime "me.shedaniel:RoughlyEnoughItems-fabric:${rei_version}"
     modLocalRuntime "dev.architectury:architectury-fabric:${architectury_version}"
     modLocalRuntime "me.shedaniel.cloth:cloth-config-fabric:${cloth_config_version}"
-    // modLocalRuntime "mezz.jei:jei-${minecraft_version}-fabric:${jei_version}"
-    // modLocalRuntime "dev.emi:emi-fabric:${emi_version}"
 }
 
 processResources {
