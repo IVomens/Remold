@@ -1,3 +1,5 @@
+<p align="center"><img src="common/src/main/resources/remold.png" width="128" alt="Remold logo"></p>
+
 # Remold
 
 **Make, change and remove recipes in-game, with a GUI. No scripts.**

@@ -6,6 +6,7 @@
   "description": "${mod_description}",
   "authors": ["${mod_authors}"],
   "license": "${mod_license}",
+  "icon": "remold.png",
   "contact": {
     "issues": "https://github.com/IVomens/Remold/issues",
     "sources": "https://github.com/IVomens/Remold"
