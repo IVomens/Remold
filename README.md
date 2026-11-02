@@ -102,3 +102,7 @@ same way templates already are). 1.20.1 has no data components, so item data wou
 - Edit tags in-game (add items to `#c:ingots/...`)
 - Undo history and per-change diff view
 - Shared "recipe packs": import a Remold export directly from the GUI
+
+## License
+
+Copyright (c) 2026 IVomens. **All rights reserved.** See [LICENSE](LICENSE).
