@@ -1,0 +1,32 @@
+package dev.remold.platform;
+
+import com.google.gson.JsonObject;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.server.level.ServerPlayer;
+
+import java.nio.file.Path;
+
+/**
+ * Everything Remold needs from the mod loader. Porting Remold to a new loader means implementing
+ * this interface (registered through {@code META-INF/services}) and forwarding a handful of events.
+ */
+public interface RemoldPlatform {
+    String loaderName();
+
+    boolean isModLoaded(String modId);
+
+    /** Human readable name for a mod id / namespace, falling back to the namespace itself. */
+    String modName(String namespace);
+
+    Path configDir();
+
+    void sendToServer(CustomPacketPayload payload);
+
+    void sendToPlayer(ServerPlayer player, CustomPacketPayload payload);
+
+    /**
+     * A recipe JSON body that makes the loader skip the recipe entirely. Writing this over an
+     * existing recipe id in a higher priority datapack removes that recipe.
+     */
+    JsonObject disabledRecipeJson();
+}
