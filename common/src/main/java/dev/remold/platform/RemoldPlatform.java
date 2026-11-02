@@ -29,4 +29,16 @@ public interface RemoldPlatform {
      * existing recipe id in a higher priority datapack removes that recipe.
      */
     JsonObject disabledRecipeJson();
+
+    /** A menu type that is never registered, for the client-only editor menu (vanilla's constructor is private). */
+    net.minecraft.world.inventory.MenuType<?> unregisteredMenuType();
+
+    /**
+     * The tag file that applies Remold's edits to a tag.
+     *
+     * @param add     entries to add (item ids, or {@code #tag} ids)
+     * @param remove  entries to remove
+     * @param current the tag's current contents (item ids), for loaders without tag removal support
+     */
+    JsonObject tagJson(java.util.List<String> add, java.util.List<String> remove, java.util.List<String> current);
 }

@@ -12,6 +12,9 @@ import me.shedaniel.rei.api.client.plugins.REIClientPlugin;
 import me.shedaniel.rei.api.client.registry.category.CategoryRegistry;
 import me.shedaniel.rei.api.client.registry.entry.EntryRegistry;
 import me.shedaniel.rei.api.client.registry.screen.ScreenRegistry;
+import me.shedaniel.rei.api.client.registry.transfer.TransferHandler;
+import me.shedaniel.rei.api.client.registry.transfer.TransferHandlerRegistry;
+import java.util.List;
 import me.shedaniel.rei.api.common.category.CategoryIdentifier;
 import me.shedaniel.rei.api.common.entry.EntryStack;
 import me.shedaniel.rei.api.common.entry.type.VanillaEntryTypes;
@@ -69,6 +72,25 @@ public class RemoldReiPlugin implements REIClientPlugin {
                             .ofRectangle(new Rectangle(a.getX(), a.getY(), a.getWidth(), a.getHeight()));
                 });
             }
+        });
+    }
+
+    /** "+" button on any REI recipe: load it into the editor. */
+    @Override
+    public void registerTransferHandlers(TransferHandlerRegistry registry) {
+        registry.register(context -> {
+            if (!(context.getContainerScreen() instanceof EditorScreen editor)) return TransferHandler.Result.createNotApplicable();
+            if (context.isActuallyCrafting()) {
+                var display = context.getDisplay();
+                List<ItemStack> inputs = display.getInputEntries().stream()
+                        .map(ingredient -> ingredient.stream().map(RemoldReiPlugin::itemOf).filter(s -> !s.isEmpty()).findFirst().orElse(ItemStack.EMPTY))
+                        .toList();
+                ItemStack output = display.getOutputEntries().stream().flatMap(i -> i.stream()).map(RemoldReiPlugin::itemOf)
+                        .filter(s -> !s.isEmpty()).findFirst().orElse(ItemStack.EMPTY);
+                editor.loadFromViewer(display.getDisplayLocation().orElse(null), inputs, output);
+                context.getMinecraft().setScreen(editor);
+            }
+            return TransferHandler.Result.createSuccessful().blocksFurtherHandling();
         });
     }
 

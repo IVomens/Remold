@@ -9,6 +9,7 @@ import dev.remold.client.RemoldClient;
 import dev.remold.client.widget.IconButton;
 import dev.remold.client.widget.UiDraw;
 import dev.remold.core.ConflictCheck;
+import dev.remold.core.ProgressionCheck;
 import dev.remold.core.EditorState;
 import dev.remold.core.GhostIngredient;
 import dev.remold.core.Machine;
@@ -20,6 +21,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.renderer.Rect2i;
@@ -170,11 +172,12 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
         save.setTooltip(Tooltip.create(RemoldText.tr("editor.save.hint").append(Component.literal("\n"))
                 .append(RemoldText.tr("editor.save.shift").withStyle(ChatFormatting.GRAY))));
         addRenderableWidget(save);
-        Button clear = Button.builder(RemoldText.tr("editor.clear"), b -> {
+        Button clear = Button.builder(RemoldText.tr("editor.clear"), b -> replaceDraft(() -> {
             state.clear();
             cursor = ItemStack.EMPTY;
+            state.markClean();
             rebuildWidgets();
-        }).bounds(x + 70, y + 117, 60, 16).build();
+        })).bounds(x + 70, y + 117, 60, 16).build();
         clear.setTooltip(Tooltip.create(RemoldText.tr("editor.clear.hint")));
         addRenderableWidget(clear);
         Button items = Button.builder(RemoldText.tr("editor.items"), b -> minecraft.setScreen(new ItemPickerScreen(this, stack -> cursor = stack)))
@@ -512,8 +515,34 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
         }
         ResourceLocation recipeId = id.getOrThrow();
         String recipeJson = json.getOrThrow().toString();
+        boolean skipChecks = hasAltDown();
+        List<Component> warnings = skipChecks ? List.of() : progressionWarnings(recipeId, json.getOrThrow());
+        if (warnings.isEmpty()) {
+            saveChecked(recipeId, recipeJson, apply, skipChecks);
+        } else {
+            minecraft.setScreen(new WarningScreen(this, warnings, () -> saveChecked(recipeId, recipeJson, apply, false)));
+        }
+    }
+
+    /** Duplication loops, and items that stop being craftable when this replaces an existing recipe. */
+    private List<Component> progressionWarnings(ResourceLocation recipeId, JsonObject json) {
+        var parsed = net.minecraft.world.item.crafting.Recipe.CODEC.parse(
+                registries().createSerializationContext(com.mojang.serialization.JsonOps.INSTANCE), json).result();
+        if (parsed.isEmpty()) return List.of();
+        var all = recipes().getRecipes();
+        List<Component> warnings = new ArrayList<>(ProgressionCheck.duplicationLoops(parsed.get(), recipeId, all, registries()));
+        if (recipes().byKey(recipeId).isPresent()) {
+            List<net.minecraft.world.item.crafting.Recipe<?>> after = ProgressionCheck.without(all, java.util.Set.of(recipeId));
+            after.add(parsed.get());
+            warnings.addAll(ProgressionCheck.describeLost(ProgressionCheck.lostItems(
+                    all.stream().<net.minecraft.world.item.crafting.Recipe<?>>map(RecipeHolder::value).toList(), after, java.util.Set.of(), registries()), 12));
+        }
+        return warnings;
+    }
+
+    private void saveChecked(ResourceLocation recipeId, String recipeJson, boolean apply, boolean skipChecks) {
         List<ResourceLocation> conflicts = ConflictCheck.find(state, recipes(), minecraft.level, recipeId);
-        if (conflicts.isEmpty() || hasAltDown()) {
+        if (conflicts.isEmpty() || skipChecks) {
             send(recipeId, recipeJson, apply);
             return;
         }
@@ -537,6 +566,38 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
             settingId = true;
             idBox.setValue(state.recipeId);
             settingId = false;
+        }
+        state.markClean();
+    }
+
+    // ------------------------------------------------------------------ unsaved changes
+
+    @Nullable private Runnable pendingReplace;
+
+    /**
+     * Runs an action that replaces the draft (load, clear). If the draft has unsaved changes, asks first.
+     * The question is shown the next time this screen ticks, because loads often come from other screens
+     * (the recipe browser, JEI) that switch back to the editor right after.
+     */
+    private void replaceDraft(Runnable action) {
+        if (!state.isDirty()) {
+            action.run();
+        } else {
+            pendingReplace = action;
+        }
+    }
+
+    @Override
+    protected void containerTick() {
+        super.containerTick();
+        if (pendingReplace != null && minecraft.screen == this) {
+            Runnable action = pendingReplace;
+            pendingReplace = null;
+            minecraft.setScreen(new ConfirmScreen(discard -> {
+                minecraft.setScreen(this);
+                if (discard) action.run();
+            }, RemoldText.tr("editor.unsaved.title"), RemoldText.tr("editor.unsaved.message"),
+                    RemoldText.tr("editor.unsaved.discard"), RemoldText.tr("editor.unsaved.keep")));
         }
     }
 
@@ -567,10 +628,13 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
 
     /** Loads an existing recipe into the editor (from the browser or a recipe viewer). */
     public void load(RecipeHolder<?> holder) {
-        RecipeFactory.load(state, holder, recipes(), registries());
-        cursor = ItemStack.EMPTY;
-        selectedOutput = 0;
-        rebuildWidgets();
+        replaceDraft(() -> {
+            RecipeFactory.load(state, holder, recipes(), registries());
+            cursor = ItemStack.EMPTY;
+            selectedOutput = 0;
+            state.markClean();
+            if (minecraft.screen == this) rebuildWidgets();
+        });
     }
 
     /** Called when a template requested from the server arrives. */
@@ -578,16 +642,31 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
         Machine machine = state.machine;
         if (machine.isTemplate() && state.template == null && !machine.examples().isEmpty()
                 && machine.examples().get(Math.floorMod(state.exampleIndex, machine.examples().size())).id().equals(id)) {
+            boolean wasClean = !state.isDirty();
             RecipeFactory.loadExample(state, state.exampleIndex, registries());
+            if (wasClean) state.markClean();
             rebuildWidgets();
         }
     }
 
+    /**
+     * For recipe viewers' "+" buttons: loads the recipe with this id if it exists, otherwise the loose items
+     * (for displays that aren't real recipes, like anvil or brewing).
+     */
+    public void loadFromViewer(@Nullable ResourceLocation recipeId, List<ItemStack> inputs, ItemStack output) {
+        var holder = recipeId == null ? java.util.Optional.<RecipeHolder<?>>empty() : recipes().byKey(recipeId);
+        if (holder.isPresent()) load(holder.get());
+        else loadItems(inputs, output, false);
+    }
+
     /** Loads loose items when a recipe viewer shows something that isn't a real recipe. */
     public void loadItems(List<ItemStack> inputs, ItemStack output, boolean shaped) {
-        RecipeFactory.loadItems(state, inputs, output, shaped, registries());
-        updateAutoId();
-        rebuildWidgets();
+        replaceDraft(() -> {
+            RecipeFactory.loadItems(state, inputs, output, shaped, registries());
+            updateAutoId();
+            state.markClean();
+            if (minecraft.screen == this) rebuildWidgets();
+        });
     }
 
     // ------------------------------------------------------------------ recipe viewer support

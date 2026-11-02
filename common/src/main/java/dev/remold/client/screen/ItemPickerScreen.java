@@ -13,6 +13,10 @@ import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
+import dev.remold.client.PickerMemory;
+import net.minecraft.client.gui.components.CycleButton;
+import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.world.item.Item;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -31,6 +35,10 @@ public class ItemPickerScreen extends Screen {
     private EditBox search;
     private List<ItemStack> filtered = List.of();
     private int scrollRow;
+    private String query = "";
+    private Show show = Show.ALL;
+
+    enum Show { ALL, FAVOURITES, RECENT }
     private int cols, rows, gridX, gridY;
 
     public ItemPickerScreen(Screen parent, Consumer<ItemStack> onPick) {
@@ -60,10 +68,20 @@ public class ItemPickerScreen extends Screen {
 
     @Override
     protected void init() {
-        search = new EditBox(font, width / 2 - 100, 22, 200, 16, RemoldText.tr("search"));
+        search = new EditBox(font, width / 2 - 150, 22, 196, 16, RemoldText.tr("search"));
+        search.setValue(query);
         search.setHint(RemoldText.tr("picker.search").withStyle(ChatFormatting.DARK_GRAY));
-        search.setResponder(s -> refresh());
+        search.setResponder(s -> {
+            query = s;
+            refresh();
+        });
         addRenderableWidget(search);
+        addRenderableWidget(CycleButton.<Show>builder(v -> RemoldText.tr("picker.show." + v.name().toLowerCase(Locale.ROOT)))
+                .withValues(Show.values()).withInitialValue(show)
+                .create(width / 2 + 50, 20, 100, 20, RemoldText.tr("picker.show"), (b, v) -> {
+                    show = v;
+                    refresh();
+                })).setTooltip(Tooltip.create(RemoldText.tr("picker.show.hint")));
         addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, b -> onClose()).bounds(width / 2 - 50, height - 28, 100, 20).build());
         cols = Math.max(1, Math.min(18, (width - 40) / 18));
         rows = Math.max(1, (height - 80) / 18);
@@ -82,12 +100,35 @@ public class ItemPickerScreen extends Screen {
             q = space < 0 ? "" : q.substring(space + 1).trim();
         }
         String text = q, modFilter = mod;
-        filtered = allItems().stream().filter(stack -> {
+        List<ItemStack> source = switch (show) {
+            case FAVOURITES -> stacksFor(PickerMemory.favourites());
+            case RECENT -> stacksFor(PickerMemory.recent());
+            case ALL -> {
+                if (!q.isEmpty() || modFilter != null) yield allItems();
+                // No search: favourites and recent items first, so they're one click away.
+                LinkedHashSet<Item> first = new LinkedHashSet<>();
+                stacksFor(PickerMemory.favourites()).forEach(s -> first.add(s.getItem()));
+                stacksFor(PickerMemory.recent()).forEach(s -> first.add(s.getItem()));
+                List<ItemStack> ordered = new ArrayList<>(first.stream().map(ItemStack::new).toList());
+                for (ItemStack s : allItems()) if (!first.contains(s.getItem()) || s.getComponentsPatch().size() > 0) ordered.add(s);
+                yield ordered;
+            }
+        };
+        filtered = source.stream().filter(stack -> {
             var id = BuiltInRegistries.ITEM.getKey(stack.getItem());
             if (modFilter != null && !id.getNamespace().startsWith(modFilter)) return false;
             return text.isEmpty() || stack.getHoverName().getString().toLowerCase(Locale.ROOT).contains(text) || id.toString().contains(text);
         }).toList();
         scrollRow = 0;
+    }
+
+    private static List<ItemStack> stacksFor(List<String> ids) {
+        List<ItemStack> stacks = new ArrayList<>();
+        for (String id : ids) {
+            var rl = net.minecraft.resources.ResourceLocation.tryParse(id);
+            if (rl != null && BuiltInRegistries.ITEM.containsKey(rl)) stacks.add(new ItemStack(BuiltInRegistries.ITEM.get(rl)));
+        }
+        return stacks;
     }
 
     private int maxScroll() {
@@ -112,6 +153,13 @@ public class ItemPickerScreen extends Screen {
                 int i = (scrollRow + r) * cols + c;
                 if (i >= filtered.size()) break;
                 g.renderItem(filtered.get(i), gridX + c * 18 + 1, gridY + r * 18 + 1);
+                if (PickerMemory.isFavourite(filtered.get(i).getItem())) {
+                    int x = gridX + c * 18 + 13, y = gridY + r * 18 + 1;
+                    g.pose().pushPose();
+                    g.pose().translate(0, 0, 200);
+                    g.fill(x, y, x + 4, y + 4, 0xFFFFD700);
+                    g.pose().popPose();
+                }
             }
         }
         g.drawString(font, RemoldText.tr("picker.count", filtered.size()), gridX, gridY + rows * 18 + 4, 0x808080);
@@ -122,6 +170,7 @@ public class ItemPickerScreen extends Screen {
             ItemStack stack = filtered.get(hovered);
             List<Component> lines = new ArrayList<>(getTooltipFromItem(minecraft, stack));
             lines.add(Component.literal(BuiltInRegistries.ITEM.getKey(stack.getItem()).toString()).withStyle(ChatFormatting.DARK_GRAY));
+            lines.add(RemoldText.tr(PickerMemory.isFavourite(stack.getItem()) ? "picker.unfavourite" : "picker.favourite").withStyle(ChatFormatting.DARK_GRAY));
             g.renderComponentTooltip(font, lines, mouseX, mouseY);
         }
     }
@@ -129,8 +178,14 @@ public class ItemPickerScreen extends Screen {
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         int i = indexAt(mouseX, mouseY);
+        if (i >= 0 && (button == 1 || button == 2)) {
+            PickerMemory.toggleFavourite(filtered.get(i).getItem());
+            if (show == Show.FAVOURITES) refresh();
+            return true;
+        }
         if (i >= 0) {
             ItemStack stack = filtered.get(i).copy();
+            PickerMemory.used(stack.getItem());
             if (button == 0 && hasShiftDown()) stack.setCount(stack.getMaxStackSize());
             onPick.accept(stack);
             minecraft.setScreen(parent);

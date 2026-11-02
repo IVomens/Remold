@@ -30,6 +30,7 @@ public class RemoldNeoForge {
         });
         NeoForge.EVENT_BUS.addListener((ServerStartingEvent e) -> RemoldPack.onServerStarting());
         NeoForge.EVENT_BUS.addListener((ServerStoppedEvent e) -> RemoldPack.onServerStopped());
+        NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.event.tick.ServerTickEvent.Post e) -> RemoldPack.onServerTick(e.getServer()));
         if (dist.isClient()) {
             RemoldNeoForgeClient.init(modBus);
         }
@@ -46,6 +47,14 @@ public class RemoldNeoForge {
                 (p, ctx) -> ServerActions.handleAction((ServerPlayer) ctx.player(), p));
         registrar.playToServer(Payloads.SetAnnotation.TYPE, Payloads.SetAnnotation.CODEC,
                 (p, ctx) -> ServerActions.handleAnnotation((ServerPlayer) ctx.player(), p));
+        registrar.playToServer(Payloads.SetTag.TYPE, Payloads.SetTag.CODEC,
+                (p, ctx) -> ServerActions.handleTag((ServerPlayer) ctx.player(), p));
+        registrar.playToServer(Payloads.Bulk.TYPE, Payloads.Bulk.CODEC,
+                (p, ctx) -> ServerActions.handleBulk((ServerPlayer) ctx.player(), p));
+        registrar.playToServer(Payloads.Unify.TYPE, Payloads.Unify.CODEC,
+                (p, ctx) -> ServerActions.handleUnify((ServerPlayer) ctx.player(), p));
+        registrar.playToServer(Payloads.ImportRequest.TYPE, Payloads.ImportRequest.CODEC,
+                (p, ctx) -> ServerActions.handleImport((ServerPlayer) ctx.player(), p));
         registrar.playToServer(Payloads.RequestTemplate.TYPE, Payloads.RequestTemplate.CODEC,
                 (p, ctx) -> ServerActions.handleTemplateRequest((ServerPlayer) ctx.player(), p));
 
@@ -54,6 +63,7 @@ public class RemoldNeoForge {
         registrar.playToClient(Payloads.SyncAnnotations.TYPE, Payloads.SyncAnnotations.CODEC, (p, ctx) -> RemoldClient.handle(p));
         registrar.playToClient(Payloads.SyncChanges.TYPE, Payloads.SyncChanges.CODEC, (p, ctx) -> RemoldClient.handle(p));
         registrar.playToClient(Payloads.TemplateJson.TYPE, Payloads.TemplateJson.CODEC, (p, ctx) -> RemoldClient.handle(p));
+        registrar.playToClient(Payloads.ImportList.TYPE, Payloads.ImportList.CODEC, (p, ctx) -> RemoldClient.handle(p));
         registrar.playToClient(Payloads.Access.TYPE, Payloads.Access.CODEC, (p, ctx) -> RemoldClient.handle(p));
         registrar.playToClient(Payloads.Notice.TYPE, Payloads.Notice.CODEC, (p, ctx) -> RemoldClient.handle(p));
     }

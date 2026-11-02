@@ -62,7 +62,7 @@ public final class RemoldClient {
     }
 
     public static void handle(Payloads.SyncChanges payload) {
-        ClientState.setChanges(payload.changes(), payload.pendingApply(), payload.canUndo());
+        ClientState.setChanges(payload.changes(), payload.pendingApply(), payload.canUndo(), payload.tagEdits(), payload.unify());
         TemplateCache.clear();
     }
 
@@ -70,6 +70,12 @@ public final class RemoldClient {
         TemplateCache.receive(payload);
         if (Minecraft.getInstance().screen instanceof EditorScreen editor) {
             editor.onTemplateReceived(payload.id());
+        }
+    }
+
+    public static void handle(Payloads.ImportList payload) {
+        if (Minecraft.getInstance().screen instanceof dev.remold.client.screen.ImportScreen screen) {
+            screen.receive(payload);
         }
     }
 

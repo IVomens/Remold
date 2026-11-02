@@ -27,12 +27,17 @@ public class RemoldFabric implements ModInitializer {
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> ServerActions.onLogin(handler.getPlayer()));
         ServerLifecycleEvents.SERVER_STARTING.register(server -> RemoldPack.onServerStarting());
         ServerLifecycleEvents.SERVER_STOPPED.register(server -> RemoldPack.onServerStopped());
+        net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents.END_SERVER_TICK.register(RemoldPack::onServerTick);
     }
 
     private static void registerPayloads() {
         toServer(Payloads.SaveRecipe.TYPE, Payloads.SaveRecipe.CODEC, ServerActions::handleSave);
         toServer(Payloads.RecipeAction.TYPE, Payloads.RecipeAction.CODEC, ServerActions::handleAction);
         toServer(Payloads.SetAnnotation.TYPE, Payloads.SetAnnotation.CODEC, ServerActions::handleAnnotation);
+        toServer(Payloads.SetTag.TYPE, Payloads.SetTag.CODEC, ServerActions::handleTag);
+        toServer(Payloads.Bulk.TYPE, Payloads.Bulk.CODEC, ServerActions::handleBulk);
+        toServer(Payloads.Unify.TYPE, Payloads.Unify.CODEC, ServerActions::handleUnify);
+        toServer(Payloads.ImportRequest.TYPE, Payloads.ImportRequest.CODEC, ServerActions::handleImport);
         toServer(Payloads.RequestTemplate.TYPE, Payloads.RequestTemplate.CODEC, ServerActions::handleTemplateRequest);
 
         // Client-bound types are registered on both sides; their handlers are set in RemoldFabricClient.
@@ -40,6 +45,7 @@ public class RemoldFabric implements ModInitializer {
         PayloadTypeRegistry.playS2C().register(Payloads.SyncAnnotations.TYPE, Payloads.SyncAnnotations.CODEC);
         PayloadTypeRegistry.playS2C().register(Payloads.SyncChanges.TYPE, Payloads.SyncChanges.CODEC);
         PayloadTypeRegistry.playS2C().register(Payloads.TemplateJson.TYPE, Payloads.TemplateJson.CODEC);
+        PayloadTypeRegistry.playS2C().register(Payloads.ImportList.TYPE, Payloads.ImportList.CODEC);
         PayloadTypeRegistry.playS2C().register(Payloads.Access.TYPE, Payloads.Access.CODEC);
         PayloadTypeRegistry.playS2C().register(Payloads.Notice.TYPE, Payloads.Notice.CODEC);
     }

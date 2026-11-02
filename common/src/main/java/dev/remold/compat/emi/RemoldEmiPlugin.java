@@ -1,7 +1,15 @@
 package dev.remold.compat.emi;
 
 import dev.remold.client.ClientState;
+import dev.remold.client.screen.EditorMenu;
 import dev.remold.client.screen.EditorScreen;
+import dev.emi.emi.api.recipe.EmiPlayerInventory;
+import dev.emi.emi.api.recipe.EmiRecipe;
+import dev.emi.emi.api.recipe.handler.EmiCraftContext;
+import dev.emi.emi.api.recipe.handler.EmiRecipeHandler;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import java.util.List;
 import dev.remold.compat.ViewerBridge;
 import dev.emi.emi.api.EmiApi;
 import dev.emi.emi.api.EmiEntrypoint;
@@ -45,6 +53,35 @@ public class RemoldEmiPlugin implements EmiPlugin {
         registry.addStackProvider(EditorScreen.class, (screen, x, y) -> {
             ItemStack stack = screen.ghostStackAt(x, y);
             return stack.isEmpty() ? EmiStackInteraction.EMPTY : new EmiStackInteraction(EmiStack.of(stack));
+        });
+
+        // "+" button on any EMI recipe: load it into the editor.
+        registry.addRecipeHandler(EditorMenu.TYPE, new EmiRecipeHandler<>() {
+            @Override
+            public EmiPlayerInventory getInventory(AbstractContainerScreen<EditorMenu> screen) {
+                return new EmiPlayerInventory(List.of());
+            }
+
+            @Override
+            public boolean supportsRecipe(EmiRecipe recipe) {
+                return true;
+            }
+
+            @Override
+            public boolean canCraft(EmiRecipe recipe, EmiCraftContext<EditorMenu> context) {
+                return true;
+            }
+
+            @Override
+            public boolean craft(EmiRecipe recipe, EmiCraftContext<EditorMenu> context) {
+                if (!(context.getScreen() instanceof EditorScreen editor)) return false;
+                var backing = recipe.getBackingRecipe();
+                List<ItemStack> inputs = recipe.getInputs().stream().map(RemoldEmiPlugin::first).toList();
+                ItemStack output = recipe.getOutputs().stream().map(EmiStack::getItemStack).filter(s -> !s.isEmpty()).findFirst().orElse(ItemStack.EMPTY);
+                editor.loadFromViewer(backing != null ? backing.id() : recipe.getId(), inputs, output);
+                Minecraft.getInstance().setScreen(editor);
+                return true;
+            }
         });
 
         registry.removeEmiStacks(stack -> {

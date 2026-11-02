@@ -52,6 +52,19 @@ public class AnnotationScreen extends Screen {
         hide = existing != null && existing.hideFromViewers();
     }
 
+    private net.minecraft.world.item.Item usageItem;
+    private int usageCount;
+
+    /** How many recipes use the item as an ingredient (shown before "make unobtainable"). */
+    private int usedIn() {
+        if (usageItem != target.getItem()) {
+            usageItem = target.getItem();
+            usageCount = (int) minecraft.level.getRecipeManager().getRecipes().stream()
+                    .filter(h -> dev.remold.core.RecipeUsage.uses(h.value(), target)).count();
+        }
+        return usageCount;
+    }
+
     private ResourceLocation id() {
         return BuiltInRegistries.ITEM.getKey(target.getItem());
     }
@@ -117,6 +130,22 @@ public class AnnotationScreen extends Screen {
 
     private void makeUnobtainable() {
         if (target.isEmpty()) return;
+        if (!hasAltDown()) {
+            java.util.Set<ResourceLocation> ids = new java.util.HashSet<>();
+            var registries = minecraft.level.registryAccess();
+            for (var h : minecraft.level.getRecipeManager().getRecipes()) {
+                if (dev.remold.core.RecipeUsage.produces(h.value(), java.util.Set.of(target.getItem()), registries)) ids.add(h.id());
+            }
+            var lost = RemovalCheck.lost(minecraft, ids, java.util.Set.of(target.getItem()));
+            if (!lost.isEmpty()) {
+                minecraft.setScreen(new WarningScreen(this, lost, this::doMakeUnobtainable));
+                return;
+            }
+        }
+        doMakeUnobtainable();
+    }
+
+    private void doMakeUnobtainable() {
         List<String> lines = new ArrayList<>();
         for (String v : values) if (!v.isBlank()) lines.add(v);
         if (!lines.contains(UNOBTAINABLE)) lines.addFirst(UNOBTAINABLE);
@@ -136,6 +165,9 @@ public class AnnotationScreen extends Screen {
         UiDraw.slot(g, x0, 33, 18);
         g.renderItem(target, x0 + 1, 34);
         g.drawString(font, target.isEmpty() ? RemoldText.tr("tooltip.none").withStyle(ChatFormatting.RED) : target.getHoverName(), x0 + 22, 38, 0xFFFFFF);
+        if (!target.isEmpty()) {
+            g.drawString(font, RemoldText.tr("tooltip.used_in", usedIn()).withStyle(ChatFormatting.GRAY), x0, height - 36, 0xFFFFFF);
+        }
         g.drawString(font, RemoldText.tr("tooltip.lines"), x0, 56, 0xA0A0A0);
         if (!target.isEmpty()) {
             // live preview

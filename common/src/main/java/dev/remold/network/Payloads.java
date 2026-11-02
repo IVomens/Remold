@@ -3,6 +3,8 @@ package dev.remold.network;
 import dev.remold.Remold;
 import dev.remold.data.Annotation;
 import dev.remold.data.ChangeEntry;
+import dev.remold.data.TagEdit;
+import dev.remold.data.UnifySettings;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
@@ -88,6 +90,75 @@ public final class Payloads {
         }
     }
 
+    /** Replace Remold's edits of one item tag (the full set of additions and removals). */
+    public record SetTag(ResourceLocation tag, TagEdit edit, boolean apply) implements CustomPacketPayload {
+        public static final Type<SetTag> TYPE = Payloads.typeOf("set_tag");
+        public static final StreamCodec<ByteBuf, SetTag> CODEC = StreamCodec.composite(
+                ResourceLocation.STREAM_CODEC, SetTag::tag,
+                TagEdit.STREAM_CODEC, SetTag::edit,
+                ByteBufCodecs.BOOL, SetTag::apply,
+                SetTag::new);
+
+        @Override
+        public Type<SetTag> type() {
+            return TYPE;
+        }
+    }
+
+    public enum BulkKind {
+        /** Replace item {@code a} with item {@code b}. Scope: 0 inputs and outputs, 1 inputs, 2 outputs. */
+        REPLACE_ITEM,
+        /** Remove every recipe that uses item {@code a} as an ingredient (tags included). */
+        REMOVE_USING_ITEM,
+        /** Remove every recipe from mod {@code a}. Scope: 0 by recipe id, 1 by the output item's mod. */
+        REMOVE_FROM_MOD
+    }
+
+    /** One action applied to many recipes at once; undone as a single step. */
+    public record Bulk(BulkKind kind, String a, String b, int scope, boolean apply) implements CustomPacketPayload {
+        public static final Type<Bulk> TYPE = Payloads.typeOf("bulk");
+        public static final StreamCodec<ByteBuf, Bulk> CODEC = StreamCodec.composite(
+                ByteBufCodecs.VAR_INT.map(o -> BulkKind.values()[o], BulkKind::ordinal), Bulk::kind,
+                ByteBufCodecs.STRING_UTF8, Bulk::a,
+                ByteBufCodecs.STRING_UTF8, Bulk::b,
+                ByteBufCodecs.VAR_INT, Bulk::scope,
+                ByteBufCodecs.BOOL, Bulk::apply,
+                Bulk::new);
+
+        @Override
+        public Type<Bulk> type() {
+            return TYPE;
+        }
+    }
+
+    /** List the packs in the import folder (file empty), or import one. */
+    public record ImportRequest(String file, boolean apply) implements CustomPacketPayload {
+        public static final Type<ImportRequest> TYPE = Payloads.typeOf("import_request");
+        public static final StreamCodec<ByteBuf, ImportRequest> CODEC = StreamCodec.composite(
+                ByteBufCodecs.STRING_UTF8, ImportRequest::file,
+                ByteBufCodecs.BOOL, ImportRequest::apply,
+                ImportRequest::new);
+
+        @Override
+        public Type<ImportRequest> type() {
+            return TYPE;
+        }
+    }
+
+    /** Unify items: for each tag in the settings, make every recipe produce the preferred item. */
+    public record Unify(UnifySettings settings, boolean apply) implements CustomPacketPayload {
+        public static final Type<Unify> TYPE = Payloads.typeOf("unify");
+        public static final StreamCodec<ByteBuf, Unify> CODEC = StreamCodec.composite(
+                UnifySettings.STREAM_CODEC, Unify::settings,
+                ByteBufCodecs.BOOL, Unify::apply,
+                Unify::new);
+
+        @Override
+        public Type<Unify> type() {
+            return TYPE;
+        }
+    }
+
     /** Ask the server for a recipe's original JSON, to use as a template for a machine. */
     public record RequestTemplate(ResourceLocation id) implements CustomPacketPayload {
         public static final Type<RequestTemplate> TYPE = Payloads.typeOf("request_template");
@@ -143,12 +214,16 @@ public final class Payloads {
         }
     }
 
-    public record SyncChanges(List<ChangeEntry> changes, boolean pendingApply, boolean canUndo) implements CustomPacketPayload {
+    public record SyncChanges(List<ChangeEntry> changes, boolean pendingApply, boolean canUndo,
+                              Map<ResourceLocation, TagEdit> tagEdits, UnifySettings unify) implements CustomPacketPayload {
         public static final Type<SyncChanges> TYPE = Payloads.typeOf("sync_changes");
         public static final StreamCodec<ByteBuf, SyncChanges> CODEC = StreamCodec.composite(
                 ChangeEntry.STREAM_CODEC.apply(ByteBufCodecs.list()), SyncChanges::changes,
                 ByteBufCodecs.BOOL, SyncChanges::pendingApply,
                 ByteBufCodecs.BOOL, SyncChanges::canUndo,
+                ByteBufCodecs.<ByteBuf, ResourceLocation, TagEdit, Map<ResourceLocation, TagEdit>>map(HashMap::new,
+                        ResourceLocation.STREAM_CODEC, TagEdit.STREAM_CODEC), SyncChanges::tagEdits,
+                UnifySettings.STREAM_CODEC, SyncChanges::unify,
                 SyncChanges::new);
 
         @Override
@@ -167,6 +242,31 @@ public final class Payloads {
 
         @Override
         public Type<Access> type() {
+            return TYPE;
+        }
+    }
+
+    /** One pack in the import folder. {@code error} is empty when it could be read. */
+    public record ImportSummary(String file, int recipes, int removals, int tags, int annotations, String error) {
+        public static final StreamCodec<ByteBuf, ImportSummary> CODEC = StreamCodec.composite(
+                ByteBufCodecs.STRING_UTF8, ImportSummary::file,
+                ByteBufCodecs.VAR_INT, ImportSummary::recipes,
+                ByteBufCodecs.VAR_INT, ImportSummary::removals,
+                ByteBufCodecs.VAR_INT, ImportSummary::tags,
+                ByteBufCodecs.VAR_INT, ImportSummary::annotations,
+                ByteBufCodecs.STRING_UTF8, ImportSummary::error,
+                ImportSummary::new);
+    }
+
+    public record ImportList(List<ImportSummary> files, String folder) implements CustomPacketPayload {
+        public static final Type<ImportList> TYPE = Payloads.typeOf("import_list");
+        public static final StreamCodec<ByteBuf, ImportList> CODEC = StreamCodec.composite(
+                ImportSummary.CODEC.apply(ByteBufCodecs.list()), ImportList::files,
+                ByteBufCodecs.STRING_UTF8, ImportList::folder,
+                ImportList::new);
+
+        @Override
+        public Type<ImportList> type() {
             return TYPE;
         }
     }

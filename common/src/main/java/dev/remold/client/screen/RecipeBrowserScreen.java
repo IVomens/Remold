@@ -18,6 +18,8 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import dev.remold.core.RecipeUsage;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.RecipeHolder;
@@ -26,6 +28,8 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -37,7 +41,7 @@ public class RecipeBrowserScreen extends Screen {
     private boolean changesOnly;
     private EditBox search;
     private RowList list;
-    private Button edit, remove, revert, undo;
+    private Button edit, remove, revert, undo, uses;
     @Nullable private Row selected;
 
     record Row(ResourceLocation id, @Nullable RecipeHolder<?> holder, ItemStack icon, String type, @Nullable ChangeEntry change) {}
@@ -48,9 +52,31 @@ public class RecipeBrowserScreen extends Screen {
         this.query = query;
     }
 
+    /** What the search box matches. */
+    enum Mode { ALL, MAKES, USES }
+
+    private Mode mode = Mode.ALL;
+
+    /** Opens the browser listing every recipe that uses {@code item} as an ingredient. */
+    public static RecipeBrowserScreen usesOf(EditorScreen editor, ItemStack item) {
+        RecipeBrowserScreen screen = new RecipeBrowserScreen(editor, BuiltInRegistries.ITEM.getKey(item.getItem()).toString());
+        screen.mode = Mode.USES;
+        return screen;
+    }
+
     @Override
     protected void init() {
-        search = new EditBox(font, width / 2 - 150, 22, 196, 16, RemoldText.tr("search"));
+        int x0 = width / 2 - 182;
+        addRenderableWidget(Button.builder(RemoldText.tr("browser.tags"), b -> minecraft.setScreen(new TagEditorScreen(this)))
+                .bounds(x0, 4, 60, 16).build()).setTooltip(Tooltip.create(RemoldText.tr("browser.tags.hint")));
+        addRenderableWidget(Button.builder(RemoldText.tr("browser.import"), b -> minecraft.setScreen(new ImportScreen(this)))
+                .bounds(x0 + 64, 4, 60, 16).build()).setTooltip(Tooltip.create(RemoldText.tr("browser.import.hint")));
+        addRenderableWidget(Button.builder(RemoldText.tr("browser.unify"), b -> minecraft.setScreen(new UnifyScreen(this)))
+                .bounds(x0 + 240, 4, 60, 16).build()).setTooltip(Tooltip.create(RemoldText.tr("browser.unify.hint")));
+        addRenderableWidget(Button.builder(RemoldText.tr("browser.bulk"), b -> minecraft.setScreen(new BulkScreen(this)))
+                .bounds(x0 + 304, 4, 60, 16).build()).setTooltip(Tooltip.create(RemoldText.tr("browser.bulk.hint")));
+
+        search = new EditBox(font, x0, 24, 176, 16, RemoldText.tr("search"));
         search.setHint(RemoldText.tr("browser.search").withStyle(ChatFormatting.DARK_GRAY));
         search.setValue(query);
         search.setResponder(s -> {
@@ -58,32 +84,63 @@ public class RecipeBrowserScreen extends Screen {
             refresh();
         });
         addRenderableWidget(search);
+        addRenderableWidget(CycleButton.<Mode>builder(m -> RemoldText.tr("browser.mode." + m.name().toLowerCase(Locale.ROOT)))
+                .withValues(Mode.values()).withInitialValue(mode)
+                .create(x0 + 180, 22, 100, 20, RemoldText.tr("browser.mode"), (b, v) -> {
+                    mode = v;
+                    refresh();
+                })).setTooltip(Tooltip.create(RemoldText.tr("browser.mode.hint")));
         addRenderableWidget(CycleButton.onOffBuilder(changesOnly)
-                .create(width / 2 + 50, 20, 100, 20, RemoldText.tr("browser.changes"), (b, v) -> {
+                .create(x0 + 284, 22, 80, 20, RemoldText.tr("browser.changes"), (b, v) -> {
                     changesOnly = v;
                     refresh();
                 })).setTooltip(Tooltip.create(RemoldText.tr("browser.changes.hint")));
 
-        list = new RowList(minecraft, width, height - 80, 44, 22);
+        list = new RowList(minecraft, width, height - 92, 46, 22);
         addRenderableWidget(list);
 
         int y = height - 30;
-        int x = width / 2 - 155;
+        int x = width / 2 - 182;
         edit = addRenderableWidget(Button.builder(RemoldText.tr("browser.edit"), b -> editSelected()).bounds(x, y, 50, 20).build());
         edit.setTooltip(Tooltip.create(RemoldText.tr("browser.edit.hint")));
         remove = addRenderableWidget(Button.builder(RemoldText.tr("browser.remove").withStyle(ChatFormatting.RED), b -> action(Payloads.Action.REMOVE)).bounds(x + 52, y, 50, 20).build());
         remove.setTooltip(Tooltip.create(RemoldText.tr("browser.remove.hint")));
         revert = addRenderableWidget(Button.builder(RemoldText.tr("browser.restore"), b -> action(Payloads.Action.REVERT)).bounds(x + 104, y, 50, 20).build());
         revert.setTooltip(Tooltip.create(RemoldText.tr("browser.restore.hint")));
+        uses = addRenderableWidget(Button.builder(RemoldText.tr("browser.uses"), b -> showUses()).bounds(x + 156, y, 50, 20).build());
+        uses.setTooltip(Tooltip.create(RemoldText.tr("browser.uses.hint")));
         undo = addRenderableWidget(Button.builder(RemoldText.tr("browser.undo"), b -> Services.PLATFORM.sendToServer(
-                new Payloads.RecipeAction(Payloads.Action.UNDO, dev.remold.Remold.id("none"), !hasShiftDown()))).bounds(x + 156, y, 50, 20).build());
+                new Payloads.RecipeAction(Payloads.Action.UNDO, dev.remold.Remold.id("none"), !hasShiftDown()))).bounds(x + 208, y, 50, 20).build());
         undo.setTooltip(Tooltip.create(RemoldText.tr("browser.undo.hint")));
         Button apply = addRenderableWidget(Button.builder(RemoldText.tr("browser.apply"), b -> Services.PLATFORM.sendToServer(Payloads.RecipeAction.simple(Payloads.Action.APPLY)))
-                .bounds(x + 208, y, 50, 20).build());
+                .bounds(x + 260, y, 50, 20).build());
         apply.setTooltip(Tooltip.create(RemoldText.tr("browser.apply.hint")));
-        addRenderableWidget(Button.builder(CommonComponents.GUI_BACK, b -> onClose()).bounds(x + 260, y, 50, 20).build());
+        addRenderableWidget(Button.builder(CommonComponents.GUI_BACK, b -> onClose()).bounds(x + 312, y, 52, 20).build());
         refresh();
         setInitialFocus(search);
+    }
+
+    private void showUses() {
+        if (selected == null || selected.holder() == null) return;
+        mode = Mode.USES;
+        query = BuiltInRegistries.ITEM.getKey(selected.icon().getItem()).toString();
+        rebuildWidgets();
+    }
+
+    /** Items whose id or name matches the search (an exact id matches only that item). */
+    private Set<Item> matchingItems(String q) {
+        ResourceLocation exact = ResourceLocation.tryParse(q);
+        if (exact != null && q.contains(":") && BuiltInRegistries.ITEM.containsKey(exact)) {
+            return Set.of(BuiltInRegistries.ITEM.get(exact));
+        }
+        Set<Item> items = new HashSet<>();
+        for (Item item : BuiltInRegistries.ITEM) {
+            if (BuiltInRegistries.ITEM.getKey(item).toString().contains(q)
+                    || item.getDescription().getString().toLowerCase(Locale.ROOT).contains(q)) {
+                items.add(item);
+            }
+        }
+        return items;
     }
 
     private List<Row> allRows() {
@@ -111,22 +168,32 @@ public class RecipeBrowserScreen extends Screen {
 
     private void refresh() {
         String q = query.toLowerCase(Locale.ROOT).trim();
+        Set<Item> items = mode != Mode.ALL && !q.isEmpty() ? matchingItems(q) : Set.of();
+        var registries = minecraft.level.registryAccess();
         List<Row> rows = allRows().stream().filter(r -> {
             if (changesOnly && r.change() == null) return false;
-            if (q.isEmpty()) return true;
-            return r.id().toString().contains(q) || r.type().contains(q)
-                    || r.icon().getHoverName().getString().toLowerCase(Locale.ROOT).contains(q)
-                    || BuiltInRegistries.ITEM.getKey(r.icon().getItem()).toString().contains(q);
+            if (q.isEmpty()) return mode == Mode.ALL;
+            return switch (mode) {
+                case MAKES -> r.holder() != null && RecipeUsage.produces(r.holder().value(), items, registries);
+                case USES -> r.holder() != null && RecipeUsage.usesAny(r.holder().value(), items);
+                case ALL -> r.id().toString().contains(q) || r.type().contains(q)
+                        || r.icon().getHoverName().getString().toLowerCase(Locale.ROOT).contains(q)
+                        || BuiltInRegistries.ITEM.getKey(r.icon().getItem()).toString().contains(q);
+            };
         }).limit(2000).toList();
         list.set(rows);
+        resultCount = rows.size();
         select(null);
     }
+
+    private int resultCount;
 
     private void select(@Nullable Row row) {
         selected = row;
         edit.active = row != null && row.holder() != null;
         remove.active = row != null && row.holder() != null;
         revert.active = row != null && row.change() != null;
+        uses.active = row != null && row.holder() != null;
     }
 
     private void editSelected() {
@@ -137,7 +204,15 @@ public class RecipeBrowserScreen extends Screen {
 
     private void action(Payloads.Action action) {
         if (selected == null) return;
-        Services.PLATFORM.sendToServer(new Payloads.RecipeAction(action, selected.id(), !hasShiftDown()));
+        Payloads.RecipeAction payload = new Payloads.RecipeAction(action, selected.id(), !hasShiftDown());
+        if (action == Payloads.Action.REMOVE && !hasAltDown()) {
+            var lost = RemovalCheck.lost(minecraft, java.util.Set.of(selected.id()), java.util.Set.of());
+            if (!lost.isEmpty()) {
+                minecraft.setScreen(new WarningScreen(this, lost, () -> Services.PLATFORM.sendToServer(payload)));
+                return;
+            }
+        }
+        Services.PLATFORM.sendToServer(payload);
     }
 
     @Override
@@ -163,8 +238,10 @@ public class RecipeBrowserScreen extends Screen {
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         super.render(g, mouseX, mouseY, partialTick);
         g.drawCenteredString(font, title, width / 2, 8, 0xFFFFFF);
+        g.drawString(font, RemoldText.tr("browser.count", resultCount), width / 2 - 182, height - 42, 0x808080);
         if (ClientState.pendingApply()) {
-            g.drawCenteredString(font, RemoldText.tr("browser.pending").withStyle(ChatFormatting.YELLOW), width / 2, height - 42, 0xFFFFFF);
+            var pending = RemoldText.tr("browser.pending").withStyle(ChatFormatting.YELLOW);
+            g.drawString(font, pending, width / 2 + 182 - font.width(pending), height - 42, 0xFFFFFF);
         }
     }
 
