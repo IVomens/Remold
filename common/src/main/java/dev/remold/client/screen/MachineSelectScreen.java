@@ -1,5 +1,6 @@
 package dev.remold.client.screen;
 
+import dev.remold.RemoldText;
 import dev.remold.core.Machine;
 import dev.remold.core.Machines;
 import net.minecraft.ChatFormatting;
@@ -25,7 +26,7 @@ public class MachineSelectScreen extends Screen {
     private MachineList list;
 
     public MachineSelectScreen(Screen parent, Consumer<Machine> onPick) {
-        super(Component.literal("Choose a machine"));
+        super(RemoldText.tr("machines.title"));
         this.parent = parent;
         this.onPick = onPick;
     }
@@ -33,8 +34,8 @@ public class MachineSelectScreen extends Screen {
     @Override
     protected void init() {
         machines = Machines.all(minecraft.level.getRecipeManager(), minecraft.level.registryAccess());
-        search = new EditBox(font, width / 2 - 100, 22, 200, 16, Component.literal("Search"));
-        search.setHint(Component.literal("Search machines or mods...").withStyle(ChatFormatting.DARK_GRAY));
+        search = new EditBox(font, width / 2 - 100, 22, 200, 16, RemoldText.tr("search"));
+        search.setHint(RemoldText.tr("machines.search").withStyle(ChatFormatting.DARK_GRAY));
         search.setResponder(s -> refresh());
         addRenderableWidget(search);
         list = new MachineList(minecraft, width, height - 76, 44, 24);
@@ -94,7 +95,7 @@ public class MachineSelectScreen extends Screen {
                 g.renderItem(machine.icon(), left + 2, top + 2);
                 g.drawString(font, machine.name(), left + 24, top + 2, 0xFFFFFF);
                 String sub = machine.isTemplate()
-                        ? machine.id() + "  (" + machine.examples().size() + " recipes)"
+                        ? RemoldText.tr("machines.recipes", machine.id().toString(), machine.examples().size()).getString()
                         : machine.id().toString();
                 g.drawString(font, sub, left + 24, top + 12, 0x808080);
             }

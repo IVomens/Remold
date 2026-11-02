@@ -1,5 +1,6 @@
 package dev.remold.client.screen;
 
+import dev.remold.RemoldText;
 import dev.remold.client.ClientState;
 import dev.remold.client.RemoldClient;
 import dev.remold.client.widget.UiDraw;
@@ -37,7 +38,7 @@ public class AnnotationScreen extends Screen {
     private boolean hide;
 
     public AnnotationScreen(Screen parent, ItemStack target) {
-        super(Component.literal("Item tooltip"));
+        super(RemoldText.tr("tooltip.title"));
         this.parent = parent;
         setTarget(target);
     }
@@ -58,7 +59,7 @@ public class AnnotationScreen extends Screen {
     @Override
     protected void init() {
         int x0 = width / 2 - 110;
-        addRenderableWidget(Button.builder(Component.literal(target.isEmpty() ? "Pick item..." : "Change item..."),
+        addRenderableWidget(Button.builder(RemoldText.tr(target.isEmpty() ? "tooltip.pick" : "tooltip.change"),
                 b -> minecraft.setScreen(new ItemPickerScreen(this, s -> {
                     setTarget(s.copyWithCount(1));
                 }))).bounds(x0 + 120, 32, 100, 20).build());
@@ -67,24 +68,24 @@ public class AnnotationScreen extends Screen {
             EditBox box = new EditBox(font, x0, 66 + i * 18, 220, 16, Component.empty());
             box.setMaxLength(256);
             box.setValue(values[i]);
-            if (i == 0) box.setHint(Component.literal("e.g. &c&lITEM UNOBTAINABLE").withStyle(ChatFormatting.DARK_GRAY));
+            if (i == 0) box.setHint(RemoldText.tr("tooltip.placeholder").withStyle(ChatFormatting.DARK_GRAY));
             box.setResponder(s -> values[line] = s);
             box.active = !target.isEmpty();
             addRenderableWidget(box);
         }
         int y = 66 + LINES * 18 + 2;
         CycleButton<Boolean> hideButton = CycleButton.onOffBuilder(hide)
-                .create(x0, y, 220, 20, Component.literal("Hide from JEI / EMI"), (b, v) -> hide = v);
-        hideButton.setTooltip(Tooltip.create(Component.literal("Hide this item from recipe viewers' item lists")));
+                .create(x0, y, 220, 20, RemoldText.tr("tooltip.hide"), (b, v) -> hide = v);
+        hideButton.setTooltip(Tooltip.create(RemoldText.tr("tooltip.hide.hint")));
         hideButton.active = !target.isEmpty();
         addRenderableWidget(hideButton);
         y += 24;
 
-        Button save = Button.builder(Component.literal("Save tooltip").withStyle(ChatFormatting.GREEN), b -> send(annotation()))
+        Button save = Button.builder(RemoldText.tr("tooltip.save").withStyle(ChatFormatting.GREEN), b -> send(annotation()))
                 .bounds(x0, y, 108, 20).build();
         save.active = !target.isEmpty();
         addRenderableWidget(save);
-        Button clear = Button.builder(Component.literal("Clear tooltip"), b -> {
+        Button clear = Button.builder(RemoldText.tr("tooltip.clear"), b -> {
             for (int i = 0; i < LINES; i++) values[i] = "";
             hide = false;
             send(Annotation.EMPTY);
@@ -94,9 +95,9 @@ public class AnnotationScreen extends Screen {
         addRenderableWidget(clear);
         y = height - 24;
 
-        Button unobtainable = Button.builder(Component.literal("Make unobtainable").withStyle(ChatFormatting.RED), b -> makeUnobtainable())
+        Button unobtainable = Button.builder(RemoldText.tr("tooltip.unobtainable").withStyle(ChatFormatting.RED), b -> makeUnobtainable())
                 .bounds(x0, y, 140, 20).build();
-        unobtainable.setTooltip(Tooltip.create(Component.literal("Removes EVERY recipe that makes this item (from all mods and machines) and adds a red \"ITEM UNOBTAINABLE\" tooltip.\nUndo it per recipe from \"Recipes...\" (filter: changes).")));
+        unobtainable.setTooltip(Tooltip.create(RemoldText.tr("tooltip.unobtainable.hint")));
         unobtainable.active = !target.isEmpty();
         addRenderableWidget(unobtainable);
 
@@ -122,7 +123,7 @@ public class AnnotationScreen extends Screen {
         for (int i = 0; i < LINES; i++) values[i] = i < lines.size() ? lines.get(i) : "";
         send(new Annotation(lines, hide));
         Services.PLATFORM.sendToServer(new Payloads.RecipeAction(Payloads.Action.REMOVE_ALL_FOR_ITEM, id(), true));
-        RemoldClient.toast(true, "Making unobtainable", target.getHoverName().getString());
+        RemoldClient.toast(true, RemoldText.tr("notice.making_unobtainable.title"), target.getHoverName());
         rebuildWidgets();
     }
 
@@ -131,11 +132,11 @@ public class AnnotationScreen extends Screen {
         super.render(g, mouseX, mouseY, partialTick);
         int x0 = width / 2 - 110;
         g.drawCenteredString(font, title, width / 2, 8, 0xFFFFFF);
-        g.drawCenteredString(font, Component.literal("Shown on this item everywhere, for every player").withStyle(ChatFormatting.GRAY), width / 2, 18, 0xFFFFFF);
+        g.drawCenteredString(font, RemoldText.tr("tooltip.subtitle").withStyle(ChatFormatting.GRAY), width / 2, 18, 0xFFFFFF);
         UiDraw.slot(g, x0, 33, 18);
         g.renderItem(target, x0 + 1, 34);
-        g.drawString(font, target.isEmpty() ? Component.literal("No item selected").withStyle(ChatFormatting.RED) : target.getHoverName(), x0 + 22, 38, 0xFFFFFF);
-        g.drawString(font, "Tooltip lines (& colour codes)", x0, 56, 0xA0A0A0);
+        g.drawString(font, target.isEmpty() ? RemoldText.tr("tooltip.none").withStyle(ChatFormatting.RED) : target.getHoverName(), x0 + 22, 38, 0xFFFFFF);
+        g.drawString(font, RemoldText.tr("tooltip.lines"), x0, 56, 0xA0A0A0);
         if (!target.isEmpty()) {
             // live preview
             int px = x0 + 230;

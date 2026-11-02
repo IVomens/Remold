@@ -1,5 +1,6 @@
 plugins {
     id 'net.neoforged.moddev' version '2.0.148' apply false
+    id 'net.fabricmc.fabric-loom-remap' version '1.17.21' apply false
 }
 
 subprojects {
@@ -14,9 +15,13 @@ subprojects {
     }
 
     repositories {
-        mavenCentral()
+        // Mod repositories first; Maven Central last.
+        maven { name = 'Fabric'; url = 'https://maven.fabricmc.net/' }
         maven { name = 'Jared (JEI)'; url = 'https://maven.blamejared.com/' }
         maven { name = 'TerraformersMC (EMI)'; url = 'https://maven.terraformersmc.com/releases/' }
+        maven { name = 'Shedaniel (REI)'; url = 'https://maven.shedaniel.me/' }
+        maven { name = 'Architectury'; url = 'https://maven.architectury.dev/' }
+        mavenCentral()
     }
 
     tasks.withType(JavaCompile).configureEach {

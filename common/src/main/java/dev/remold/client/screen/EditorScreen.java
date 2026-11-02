@@ -1,5 +1,6 @@
 package dev.remold.client.screen;
 
+import dev.remold.RemoldText;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.serialization.DataResult;
 import com.google.gson.JsonObject;
@@ -7,6 +8,7 @@ import dev.remold.client.ClientState;
 import dev.remold.client.RemoldClient;
 import dev.remold.client.widget.IconButton;
 import dev.remold.client.widget.UiDraw;
+import dev.remold.core.ConflictCheck;
 import dev.remold.core.EditorState;
 import dev.remold.core.GhostIngredient;
 import dev.remold.core.Machine;
@@ -79,7 +81,7 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
     private boolean settingId;
 
     public EditorScreen(EditorMenu menu, Inventory inventory, @Nullable Screen parent) {
-        super(menu, inventory, Component.literal("Remold"));
+        super(menu, inventory, RemoldText.tr("name"));
         this.parent = parent;
         this.imageWidth = W;
         this.imageHeight = H;
@@ -110,14 +112,14 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
                     RecipeFactory.setMachine(state, m, registries());
                     updateAutoId();
                 })));
-        machineButton.setTooltip(Tooltip.create(Component.literal("Machine: ").append(machine.name())
+        machineButton.setTooltip(Tooltip.create(RemoldText.tr("editor.machine", machine.name())
                 .append(Component.literal("\n" + machine.id()).withStyle(ChatFormatting.DARK_GRAY))
-                .append(Component.literal("\nClick to choose another machine").withStyle(ChatFormatting.GRAY))));
+                .append(Component.literal("\n")).append(RemoldText.tr("editor.machine.hint").withStyle(ChatFormatting.GRAY))));
         addRenderableWidget(machineButton);
         if (template && machine.examples().size() > 1) {
             Button prev = Button.builder(Component.literal("<"), b -> switchExample(-1)).bounds(x + 130, y + 15, 14, 18).build();
             Button next = Button.builder(Component.literal(">"), b -> switchExample(1)).bounds(x + 178, y + 15, 14, 18).build();
-            Tooltip tip = Tooltip.create(Component.literal("Switch the existing recipe used as a template.\nEvery machine works differently, so Remold starts from a real recipe and lets you change its items and values."));
+            Tooltip tip = Tooltip.create(RemoldText.tr("editor.example.hint"));
             prev.setTooltip(tip);
             next.setTooltip(tip);
             addRenderableWidget(prev);
@@ -125,13 +127,13 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
         }
 
         if (machine.kind().cooking()) {
-            EditBox time = new EditBox(font, x + 150, y + 48, 42, 14, Component.literal("Cooking time"));
+            EditBox time = new EditBox(font, x + 150, y + 48, 42, 14, RemoldText.tr("editor.cook_time"));
             time.setValue(Integer.toString(state.cookTime));
             time.setFilter(s -> s.matches("\\d{0,6}"));
             time.setResponder(s -> state.cookTime = s.isEmpty() ? 0 : Integer.parseInt(s));
-            time.setTooltip(Tooltip.create(Component.literal("Cooking time in ticks (20 ticks = 1 second)")));
+            time.setTooltip(Tooltip.create(RemoldText.tr("editor.cook_time.hint")));
             addRenderableWidget(time);
-            EditBox xp = new EditBox(font, x + 150, y + 76, 42, 14, Component.literal("Experience"));
+            EditBox xp = new EditBox(font, x + 150, y + 76, 42, 14, RemoldText.tr("editor.xp"));
             xp.setValue(Float.toString(state.experience));
             xp.setFilter(s -> s.matches("\\d{0,4}(\\.\\d{0,3})?"));
             xp.setResponder(s -> {
@@ -143,15 +145,15 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
             addRenderableWidget(xp);
         }
         if (template && state.template != null && !state.template.params.isEmpty()) {
-            Button params = Button.builder(Component.literal("Values..."), b -> minecraft.setScreen(new ParamsScreen(this)))
+            Button params = Button.builder(RemoldText.tr("editor.values"), b -> minecraft.setScreen(new ParamsScreen(this)))
                     .bounds(x + 144, y + 80, 48, 16).build();
-            params.setTooltip(Tooltip.create(Component.literal("Edit numbers and other values of this recipe (time, energy, chance, fluids...)")));
+            params.setTooltip(Tooltip.create(RemoldText.tr("editor.values.hint")));
             addRenderableWidget(params);
         }
 
-        idBox = new EditBox(font, x + 8, y + 100, 184, 14, Component.literal("Recipe id"));
+        idBox = new EditBox(font, x + 8, y + 100, 184, 14, RemoldText.tr("editor.id"));
         idBox.setMaxLength(200);
-        idBox.setHint(Component.literal("recipe id, e.g. remold:my_recipe").withStyle(ChatFormatting.DARK_GRAY));
+        idBox.setHint(RemoldText.tr("editor.id.placeholder").withStyle(ChatFormatting.DARK_GRAY));
         settingId = true;
         idBox.setValue(state.recipeId);
         settingId = false;
@@ -160,38 +162,38 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
             state.recipeId = s;
             state.autoId = s.isEmpty();
         });
-        idBox.setTooltip(Tooltip.create(Component.literal("Recipe id. Use the id of an existing recipe to replace it, or a new id to add a recipe.")));
+        idBox.setTooltip(Tooltip.create(RemoldText.tr("editor.id.hint")));
         addRenderableWidget(idBox);
 
-        Button save = Button.builder(Component.literal("Save").withStyle(ChatFormatting.GREEN), b -> save(!hasShiftDown()))
+        Button save = Button.builder(RemoldText.tr("editor.save").withStyle(ChatFormatting.GREEN), b -> save(!hasShiftDown()))
                 .bounds(x + 8, y + 117, 60, 16).build();
-        save.setTooltip(Tooltip.create(Component.literal("Save and apply the recipe (Ctrl+S)\n")
-                .append(Component.literal("Shift-click to save without reloading, to apply many changes at once.").withStyle(ChatFormatting.GRAY))));
+        save.setTooltip(Tooltip.create(RemoldText.tr("editor.save.hint").append(Component.literal("\n"))
+                .append(RemoldText.tr("editor.save.shift").withStyle(ChatFormatting.GRAY))));
         addRenderableWidget(save);
-        Button clear = Button.builder(Component.literal("Clear"), b -> {
+        Button clear = Button.builder(RemoldText.tr("editor.clear"), b -> {
             state.clear();
             cursor = ItemStack.EMPTY;
             rebuildWidgets();
         }).bounds(x + 70, y + 117, 60, 16).build();
-        clear.setTooltip(Tooltip.create(Component.literal("Empty all slots and start a new recipe")));
+        clear.setTooltip(Tooltip.create(RemoldText.tr("editor.clear.hint")));
         addRenderableWidget(clear);
-        Button items = Button.builder(Component.literal("Items..."), b -> minecraft.setScreen(new ItemPickerScreen(this, stack -> cursor = stack)))
+        Button items = Button.builder(RemoldText.tr("editor.items"), b -> minecraft.setScreen(new ItemPickerScreen(this, stack -> cursor = stack)))
                 .bounds(x + 132, y + 117, 60, 16).build();
-        items.setTooltip(Tooltip.create(Component.literal("Search every item in the game")));
+        items.setTooltip(Tooltip.create(RemoldText.tr("editor.items.hint")));
         addRenderableWidget(items);
 
-        Button data = Button.builder(Component.literal("Item data..."), b -> openItemData())
+        Button data = Button.builder(RemoldText.tr("editor.item_data"), b -> openItemData())
                 .bounds(x + 8, y + 135, 60, 16).build();
-        data.setTooltip(Tooltip.create(Component.literal("Change the output's name, lore, glint, rarity... ")
-                .append(Component.literal("\ne.g. a red \"ITEM UNOBTAINABLE\" line").withStyle(ChatFormatting.GRAY))));
+        data.setTooltip(Tooltip.create(RemoldText.tr("editor.item_data.hint").append(Component.literal("\n"))
+                .append(RemoldText.tr("editor.item_data.example").withStyle(ChatFormatting.GRAY))));
         addRenderableWidget(data);
-        Button tooltip = Button.builder(Component.literal("Tooltip..."), b -> openAnnotation())
+        Button tooltip = Button.builder(RemoldText.tr("editor.tooltip"), b -> openAnnotation())
                 .bounds(x + 70, y + 135, 60, 16).build();
-        tooltip.setTooltip(Tooltip.create(Component.literal("Add tooltip lines to an item everywhere (not just this recipe's output), mark items as unobtainable, or hide them from JEI/EMI")));
+        tooltip.setTooltip(Tooltip.create(RemoldText.tr("editor.tooltip.hint")));
         addRenderableWidget(tooltip);
-        Button browse = Button.builder(Component.literal("Recipes..."), b -> openBrowser())
+        Button browse = Button.builder(RemoldText.tr("editor.recipes"), b -> openBrowser())
                 .bounds(x + 132, y + 135, 60, 16).build();
-        browse.setTooltip(Tooltip.create(Component.literal("Find existing recipes to edit, remove or restore")));
+        browse.setTooltip(Tooltip.create(RemoldText.tr("editor.recipes.hint")));
         addRenderableWidget(browse);
     }
 
@@ -239,8 +241,8 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
         }
         Machine.Kind kind = state.machine.kind();
         if (state.machine.isTemplate() && state.template == null) {
-            List<net.minecraft.util.FormattedCharSequence> lines = font.split(Component.literal(
-                    state.templateError == null ? "No template" : state.templateError), imageWidth - 16);
+            List<net.minecraft.util.FormattedCharSequence> lines = font.split(RemoldText.message(
+                    state.templateError == null ? RemoldText.error("no_template") : state.templateError), imageWidth - 16);
             for (int i = 0; i < Math.min(5, lines.size()); i++) {
                 g.drawString(font, lines.get(i), leftPos + 8, topPos + 38 + i * 10, 0xFFAA0000, false);
             }
@@ -270,7 +272,7 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
         }
         if (kind == Machine.Kind.TEMPLATE) {
             if (state.inputs.length > MAX_TEMPLATE_INPUTS) {
-                g.drawString(font, "+" + (state.inputs.length - MAX_TEMPLATE_INPUTS) + " more", leftPos + 8, topPos + 92, 0xFF404040, false);
+                g.drawString(font, RemoldText.tr("editor.more", state.inputs.length - MAX_TEMPLATE_INPUTS), leftPos + 8, topPos + 92, 0xFF404040, false);
             }
             if (state.outputs.length > MAX_TEMPLATE_OUTPUTS) {
                 g.drawString(font, "+" + (state.outputs.length - MAX_TEMPLATE_OUTPUTS), leftPos + 150, topPos + 74, 0xFF404040, false);
@@ -282,7 +284,7 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
     protected void renderLabels(GuiGraphics g, int mouseX, int mouseY) {
         g.drawString(font, title, 8, 5, 0xFF404040, false);
         if (state.loadedFrom != null) {
-            String editing = "editing " + state.loadedFrom;
+            String editing = RemoldText.tr("editor.editing", state.loadedFrom.toString()).getString();
             g.drawString(font, font.plainSubstrByWidth(editing, imageWidth - 50), 50, 5, 0xFF7A5C00, false);
         }
         Machine machine = state.machine;
@@ -291,11 +293,11 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
             g.drawString(font, label, 161 - font.width(label) / 2, 20, 0xFF404040, false);
         }
         if (machine.kind().cooking()) {
-            g.drawString(font, "Time", 150, 38, 0xFF404040, false);
-            g.drawString(font, "XP", 150, 66, 0xFF404040, false);
+            g.drawString(font, RemoldText.tr("editor.time"), 150, 38, 0xFF404040, false);
+            g.drawString(font, RemoldText.tr("editor.xp.short"), 150, 66, 0xFF404040, false);
         }
         if (machine.kind() == Machine.Kind.SHAPELESS) {
-            g.drawString(font, "any order", 118, 82, 0xFF707070, false);
+            g.drawString(font, RemoldText.tr("editor.any_order"), 118, 82, 0xFF707070, false);
         }
     }
 
@@ -324,24 +326,24 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
         if (slot.output()) {
             ItemStack stack = state.outputs[slot.index()];
             if (!stack.isEmpty()) lines.addAll(getTooltipFromItem(minecraft, stack));
-            else lines.add(Component.literal("Output").withStyle(ChatFormatting.YELLOW));
-            lines.add(Component.literal("Click with an item to set the output").withStyle(ChatFormatting.DARK_GRAY));
+            else lines.add(RemoldText.tr("editor.slot.output").withStyle(ChatFormatting.YELLOW));
+            lines.add(RemoldText.tr("editor.slot.output.hint").withStyle(ChatFormatting.DARK_GRAY));
             if (!stack.isEmpty()) {
-                lines.add(Component.literal("Scroll to change the amount, right-click to clear").withStyle(ChatFormatting.DARK_GRAY));
+                lines.add(RemoldText.tr("editor.slot.output.scroll").withStyle(ChatFormatting.DARK_GRAY));
             }
         } else {
             GhostIngredient ghost = state.inputs[slot.index()];
             if (ghost.isEmpty()) {
-                lines.add(Component.literal(state.machine.kind() == Machine.Kind.SMITHING
-                        ? new String[]{"Template", "Base", "Addition"}[slot.index()] : "Input").withStyle(ChatFormatting.YELLOW));
-                lines.add(Component.literal("Click with an item to set it (hold the mouse to paint)").withStyle(ChatFormatting.DARK_GRAY));
+                lines.add(RemoldText.tr(state.machine.kind() == Machine.Kind.SMITHING
+                        ? new String[]{"editor.slot.template", "editor.slot.base", "editor.slot.addition"}[slot.index()] : "editor.slot.input").withStyle(ChatFormatting.YELLOW));
+                lines.add(RemoldText.tr("editor.slot.input.hint").withStyle(ChatFormatting.DARK_GRAY));
             } else {
                 lines.addAll(getTooltipFromItem(minecraft, ghost.display()));
                 if (ghost.tag() != null) {
-                    lines.add(Component.literal("Accepts any #" + ghost.tag().location()).withStyle(ChatFormatting.GOLD));
+                    lines.add(RemoldText.tr("editor.slot.tag", "#" + ghost.tag().location()).withStyle(ChatFormatting.GOLD));
                 }
-                lines.add(Component.literal("Middle-click or Ctrl-click: use an item tag instead").withStyle(ChatFormatting.DARK_GRAY));
-                lines.add(Component.literal("Right-click to clear").withStyle(ChatFormatting.DARK_GRAY));
+                lines.add(RemoldText.tr("editor.slot.tag.hint").withStyle(ChatFormatting.DARK_GRAY));
+                lines.add(RemoldText.tr("editor.slot.clear").withStyle(ChatFormatting.DARK_GRAY));
             }
         }
         g.renderComponentTooltip(font, lines, mouseX, mouseY);
@@ -500,18 +502,42 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
         DataResult<ResourceLocation> id = RecipeFactory.parseId(state.recipeId.isEmpty() && state.autoId
                 ? RecipeFactory.suggestId(state, recipes()) : state.recipeId);
         if (id.error().isPresent()) {
-            RemoldClient.toast(false, "Can't save", id.error().get().message());
+            RemoldClient.toast(false, RemoldText.tr("notice.cant_save.title"), RemoldText.message(id.error().get().message()));
             return;
         }
         DataResult<JsonObject> json = RecipeFactory.build(state, registries());
         if (json.error().isPresent()) {
-            RemoldClient.toast(false, "Can't save", json.error().get().message());
+            RemoldClient.toast(false, RemoldText.tr("notice.cant_save.title"), RemoldText.message(json.error().get().message()));
             return;
         }
-        Services.PLATFORM.sendToServer(new Payloads.SaveRecipe(id.getOrThrow(), json.getOrThrow().toString(), apply));
-        state.loadedFrom = id.getOrThrow();
-        state.recipeId = id.getOrThrow().toString();
+        ResourceLocation recipeId = id.getOrThrow();
+        String recipeJson = json.getOrThrow().toString();
+        List<ResourceLocation> conflicts = ConflictCheck.find(state, recipes(), minecraft.level, recipeId);
+        if (conflicts.isEmpty() || hasAltDown()) {
+            send(recipeId, recipeJson, apply);
+            return;
+        }
+        minecraft.setScreen(new ConflictScreen(this, conflicts,
+                () -> send(recipeId, recipeJson, apply),
+                () -> {
+                    // Removals are queued (no reload) so everything is applied once, together with the save.
+                    for (ResourceLocation other : conflicts) {
+                        Services.PLATFORM.sendToServer(new Payloads.RecipeAction(Payloads.Action.REMOVE, other, false));
+                    }
+                    send(recipeId, recipeJson, apply);
+                }));
+    }
+
+    private void send(ResourceLocation id, String json, boolean apply) {
+        Services.PLATFORM.sendToServer(new Payloads.SaveRecipe(id, json, apply));
+        state.loadedFrom = id;
+        state.recipeId = id.toString();
         state.autoId = false;
+        if (idBox != null) {
+            settingId = true;
+            idBox.setValue(state.recipeId);
+            settingId = false;
+        }
     }
 
     private int outputIndexForData() {
@@ -523,7 +549,7 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
     private void openItemData() {
         int index = outputIndexForData();
         if (index < 0) {
-            RemoldClient.toast(false, "No output", "Put an item in the output slot first.");
+            RemoldClient.toast(false, RemoldText.tr("notice.no_output.title"), RemoldText.tr("notice.no_output"));
             return;
         }
         minecraft.setScreen(new ItemDataScreen(this, state.outputs[index], edited -> state.outputs[index] = edited));

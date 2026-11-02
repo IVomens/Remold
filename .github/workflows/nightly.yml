@@ -1,0 +1,105 @@
+name: Nightly
+
+# Builds the NeoForge and Fabric jars every night and publishes them as the rolling
+# "nightly" pre-release on GitHub. Nights without new commits are skipped.
+# Scheduled workflows only run on the repository's default branch; use "Run workflow"
+# on the Actions tab to build any branch on demand.
+
+on:
+  schedule:
+    - cron: '17 3 * * *' # 03:17 UTC daily
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Build even if nothing changed since the last nightly
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  nightly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for new commits
+        id: changes
+        env:
+          FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.force }}
+        run: |
+          last=$(git rev-parse -q --verify "refs/tags/nightly^{commit}" || true)
+          if [ "$FORCE" != "true" ] && [ "$last" = "$(git rev-parse HEAD)" ]; then
+            echo "No new commits since the last nightly; skipping."
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compute version
+        if: steps.changes.outputs.build == 'true'
+        id: version
+        run: |
+          base=$(grep '^mod_version=' gradle.properties | cut -d= -f2)
+          mc=$(grep '^minecraft_version=' gradle.properties | cut -d= -f2)
+          version="${base}-nightly.$(date -u +%Y%m%d).$(git rev-parse --short HEAD)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "mc=$mc" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@v4
+        if: steps.changes.outputs.build == 'true'
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+        if: steps.changes.outputs.build == 'true'
+
+      - name: Build
+        if: steps.changes.outputs.build == 'true'
+        run: ./gradlew build -Pmod_version=${{ steps.version.outputs.version }}
+
+      - name: Collect jars
+        if: steps.changes.outputs.build == 'true'
+        run: |
+          mkdir dist
+          cp neoforge/build/libs/*.jar fabric/build/libs/*.jar dist/
+          rm -f dist/*-sources.jar
+          ls -l dist
+
+      - uses: actions/upload-artifact@v4
+        if: steps.changes.outputs.build == 'true'
+        with:
+          name: remold-${{ steps.version.outputs.version }}
+          path: dist/*.jar
+
+      - name: Publish the nightly pre-release
+        if: steps.changes.outputs.build == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          MC: ${{ steps.version.outputs.mc }}
+        run: |
+          gh release delete nightly --cleanup-tag --yes || true
+          git push origin :refs/tags/nightly || true
+          cat > notes.md <<EOF
+          Automatic nightly build of \`${GITHUB_REF_NAME}\` at ${GITHUB_SHA::7}, built $(date -u '+%Y-%m-%d %H:%M UTC').
+
+          **Minecraft ${MC}.** Pick the jar for your loader:
+          - \`remold-neoforge-*.jar\` for NeoForge
+          - \`remold-fabric-*.jar\` for Fabric (requires Fabric API)
+
+          Nightlies are untested snapshots. Back up your world before using them.
+          EOF
+          gh release create nightly dist/*.jar \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "Nightly ${VERSION}" \
+            --notes-file notes.md

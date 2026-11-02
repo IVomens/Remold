@@ -8,6 +8,8 @@ base { archivesName = "${mod_id}-neoforge" }
 def common = project(':common')
 sourceSets.main.java.srcDir common.file('src/main/java')
 sourceSets.main.resources.srcDir common.file('src/main/resources')
+// REI's API differs per loader, so its plugin is compiled by each loader module instead of common.
+sourceSets.main.java.srcDir rootProject.file('compat-rei/src/main/java')
 
 neoForge {
     version = neoforge_version
@@ -38,6 +40,7 @@ dependencies {
     compileOnly "mezz.jei:jei-${minecraft_version}-common-api:${jei_version}"
     compileOnly "mezz.jei:jei-${minecraft_version}-neoforge-api:${jei_version}"
     compileOnly "dev.emi:emi-xplat-mojmap:${emi_version}:api"
+    compileOnly "me.shedaniel:RoughlyEnoughItems-api-neoforge:${rei_version}"
 
     // Recipe viewers in the dev client, so integrations can be tested with ./gradlew :neoforge:runClient
     // Swap the comment to test EMI instead of JEI.

@@ -14,6 +14,8 @@ public final class ClientState {
     private static Map<ResourceLocation, Annotation> annotations = Map.of();
     private static List<ChangeEntry> changes = List.of();
     private static boolean pendingApply;
+    private static int permissionLevel = dev.remold.Remold.PERMISSION_LEVEL;
+    private static boolean listed;
     /** The draft survives closing and re-opening the editor. */
     public static final EditorState EDITOR = new EditorState();
 
@@ -36,15 +38,34 @@ public final class ClientState {
         return pendingApply;
     }
 
-    public static void setChanges(List<ChangeEntry> list, boolean pending) {
+    private static boolean canUndo;
+
+    public static boolean canUndo() {
+        return canUndo;
+    }
+
+    public static void setChanges(List<ChangeEntry> list, boolean pending, boolean undo) {
         changes = List.copyOf(list);
         pendingApply = pending;
+        canUndo = undo;
+    }
+
+    public static void setAccess(int level, boolean isListed) {
+        permissionLevel = level;
+        listed = isListed;
+    }
+
+    public static boolean canEdit(net.minecraft.world.entity.player.Player player) {
+        return listed || player.hasPermissions(permissionLevel);
     }
 
     public static void reset() {
+        permissionLevel = dev.remold.Remold.PERMISSION_LEVEL;
+        listed = false;
         annotations = Map.of();
         changes = List.of();
         pendingApply = false;
+        canUndo = false;
         dev.remold.core.TemplateCache.clear();
     }
 }

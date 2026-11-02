@@ -1,5 +1,6 @@
 package dev.remold.client.screen;
 
+import dev.remold.RemoldText;
 import dev.remold.data.TextUtil;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
@@ -47,7 +48,7 @@ public class ItemDataScreen extends Screen {
     private final String[] loreValues = new String[LORE_LINES];
 
     public ItemDataScreen(Screen parent, ItemStack stack, Consumer<ItemStack> onDone) {
-        super(Component.literal("Item data"));
+        super(RemoldText.tr("data.title"));
         this.parent = parent;
         this.original = stack.copy();
         this.onDone = onDone;
@@ -71,38 +72,38 @@ public class ItemDataScreen extends Screen {
     protected void init() {
         int x0 = width / 2 - 110;
         int y = 30;
-        name = box(x0 + 24, y + 1, 196, nameValue, "Custom name, e.g. &6Golden Sword");
+        name = box(x0 + 24, y + 1, 196, nameValue, RemoldText.tr("data.name.placeholder").getString());
         name.setResponder(s -> nameValue = s);
         y += 22;
         for (int i = 0; i < LORE_LINES; i++) {
             int line = i;
-            lore[i] = box(x0, y + 10 + i * 18, 220, loreValues[i], i == 0 ? "Lore line, e.g. &c&lITEM UNOBTAINABLE" : "");
+            lore[i] = box(x0, y + 10 + i * 18, 220, loreValues[i], i == 0 ? RemoldText.tr("data.lore.placeholder").getString() : "");
             lore[i].setResponder(s -> loreValues[line] = s);
         }
         y += 10 + LORE_LINES * 18 + 2;
         count = box(x0 + 40, y, 40, countValue, "");
         count.setFilter(s -> s.matches("\\d{0,2}"));
         count.setResponder(s -> countValue = s);
-        modelData = box(x0 + 170, y, 50, modelValue, "none");
+        modelData = box(x0 + 170, y, 50, modelValue, RemoldText.tr("data.none").getString());
         modelData.setFilter(s -> s.matches("-?\\d{0,9}"));
         modelData.setResponder(s -> modelValue = s);
-        modelData.setTooltip(Tooltip.create(Component.literal("Custom model data, for resource packs")));
+        modelData.setTooltip(Tooltip.create(RemoldText.tr("data.model.hint")));
         y += 20;
 
-        addRenderableWidget(CycleButton.<Toggle>builder(t -> Component.literal(t == Toggle.DEFAULT ? "Auto" : cap(t.name())))
+        addRenderableWidget(CycleButton.<Toggle>builder(t -> RemoldText.tr("data.toggle." + t.name().toLowerCase(Locale.ROOT)))
                 .withValues(Toggle.values()).withInitialValue(glint)
-                .create(x0, y, 72, 20, Component.literal("Glint"), (b, v) -> glint = v));
+                .create(x0, y, 72, 20, RemoldText.tr("data.glint"), (b, v) -> glint = v));
         List<String> rarities = new ArrayList<>(List.of("default"));
         for (Rarity r : Rarity.values()) rarities.add(r.getSerializedName());
-        addRenderableWidget(CycleButton.<String>builder(s -> Component.literal(s.equals("default") ? "Auto" : cap(s)))
+        addRenderableWidget(CycleButton.<String>builder(s -> RemoldText.tr("data.rarity." + s))
                 .withValues(rarities).withInitialValue(rarity)
-                .create(x0 + 74, y, 72, 20, Component.literal("Rarity"), (b, v) -> rarity = v));
-        addRenderableWidget(CycleButton.<Toggle>builder(t -> Component.literal(t == Toggle.ON ? "Yes" : "Auto"))
+                .create(x0 + 74, y, 72, 20, RemoldText.tr("data.rarity"), (b, v) -> rarity = v));
+        addRenderableWidget(CycleButton.<Toggle>builder(t -> RemoldText.tr(t == Toggle.ON ? "data.yes" : "data.toggle.default"))
                 .withValues(Toggle.DEFAULT, Toggle.ON).withInitialValue(unbreakable)
-                .create(x0 + 148, y, 72, 20, Component.literal("Unbreak."), (b, v) -> unbreakable = v));
+                .create(x0 + 148, y, 72, 20, RemoldText.tr("data.unbreakable"), (b, v) -> unbreakable = v));
         y += 22;
 
-        Button unobtainable = Button.builder(Component.literal("+ \"ITEM UNOBTAINABLE\"").withStyle(ChatFormatting.RED), b -> {
+        Button unobtainable = Button.builder(RemoldText.tr("data.unobtainable").withStyle(ChatFormatting.RED), b -> {
             for (EditBox box : lore) {
                 if (box.getValue().isBlank()) {
                     box.setValue("&c&lITEM UNOBTAINABLE");
@@ -110,9 +111,9 @@ public class ItemDataScreen extends Screen {
                 }
             }
         }).bounds(x0, y, 128, 20).build();
-        unobtainable.setTooltip(Tooltip.create(Component.literal("Adds a red lore line to this recipe's output.\nTo mark an item as unobtainable everywhere, use \"Tooltip...\" in the editor instead.")));
+        unobtainable.setTooltip(Tooltip.create(RemoldText.tr("data.unobtainable.hint")));
         addRenderableWidget(unobtainable);
-        addRenderableWidget(Button.builder(Component.literal("Reset all"), b -> {
+        addRenderableWidget(Button.builder(RemoldText.tr("data.reset"), b -> {
             nameValue = "";
             for (int i = 0; i < LORE_LINES; i++) loreValues[i] = "";
             modelValue = "";
@@ -136,11 +137,6 @@ public class ItemDataScreen extends Screen {
         if (!hint.isEmpty()) box.setHint(Component.literal(hint).withStyle(ChatFormatting.DARK_GRAY));
         addRenderableWidget(box);
         return box;
-    }
-
-    private static String cap(String s) {
-        s = s.toLowerCase(Locale.ROOT);
-        return s.substring(0, 1).toUpperCase(Locale.ROOT) + s.substring(1);
     }
 
     private static <T> void reset(ItemStack stack, DataComponentType<T> type) {
@@ -183,14 +179,14 @@ public class ItemDataScreen extends Screen {
         super.render(g, mouseX, mouseY, partialTick);
         int x0 = width / 2 - 110;
         g.drawCenteredString(font, title, width / 2, 8, 0xFFFFFF);
-        g.drawCenteredString(font, Component.literal("Colours: &0-&f  bold &l  italic &o  underline &n  hex &#ff8800").withStyle(ChatFormatting.GRAY), width / 2, 18, 0xFFFFFF);
+        g.drawCenteredString(font, RemoldText.tr("data.colours").withStyle(ChatFormatting.GRAY), width / 2, 18, 0xFFFFFF);
         ItemStack preview = build();
         g.renderItem(preview, x0 + 2, 30);
         g.renderItemDecorations(font, preview, x0 + 2, 30);
-        g.drawString(font, "Lore", x0, 53, 0xA0A0A0);
+        g.drawString(font, RemoldText.tr("data.lore"), x0, 53, 0xA0A0A0);
         int y = 52 + 10 + LORE_LINES * 18 + 2;
-        g.drawString(font, "Count", x0, y + 4, 0xA0A0A0);
-        g.drawString(font, "Model data", x0 + 110, y + 4, 0xA0A0A0);
+        g.drawString(font, RemoldText.tr("data.count"), x0, y + 4, 0xA0A0A0);
+        g.drawString(font, RemoldText.tr("data.model"), x0 + 110, y + 4, 0xA0A0A0);
         if (mouseX >= x0 && mouseX < x0 + 20 && mouseY >= 28 && mouseY < 48) {
             g.renderComponentTooltip(font, getTooltipFromItem(minecraft, preview), mouseX, mouseY);
         }
