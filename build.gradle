@@ -1,0 +1,26 @@
+plugins {
+    id 'net.neoforged.moddev' version '2.0.148' apply false
+}
+
+subprojects {
+    apply plugin: 'java'
+
+    group = mod_group
+    version = "${mod_version}+${minecraft_version}"
+
+    java {
+        toolchain.languageVersion = JavaLanguageVersion.of(21)
+        withSourcesJar()
+    }
+
+    repositories {
+        mavenCentral()
+        maven { name = 'Jared (JEI)'; url = 'https://maven.blamejared.com/' }
+        maven { name = 'TerraformersMC (EMI)'; url = 'https://maven.terraformersmc.com/releases/' }
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+        options.release = 21
+    }
+}
