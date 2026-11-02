@@ -6,7 +6,7 @@ Remold replaces hand-written KubeJS / CraftTweaker scripts for the most common p
 Open your inventory as an operator, click the crafting-table button, drop items into a grid, and
 press **Save**. That's it.
 
-*Minecraft 1.21.1 · NeoForge (Fabric-ready architecture) · works alongside JEI and EMI*
+*Minecraft 1.21.1 · NeoForge and Fabric · works alongside JEI, EMI and REI*
 
 ---
 
@@ -22,7 +22,7 @@ press **Save**. That's it.
 | **Item data without JSON** | Give the output a custom name, lore lines, glint, rarity, unbreakable, model data and count, using `&` colour codes. |
 | **Item tooltips everywhere** | Add lines like a red **ITEM UNOBTAINABLE** to an item for every player, and optionally hide it from JEI/EMI. |
 | **Make unobtainable** | One click removes every recipe (from every mod and machine) that makes an item, and tags it. |
-| **JEI / EMI** | Drag items from the item list onto the editor slots. The JEI **+** button on any recipe loads it into the editor. **R** / **U** work on editor slots. Machine icons come from the viewer's catalysts/workstations. |
+| **JEI / EMI / REI** | Drag items from the item list onto the editor slots. Machine icons come from the viewer's catalysts/workstations. With JEI, the **+** button on any recipe loads it into the editor, and **R** / **U** work on editor slots (also with EMI). |
 | **Conflict warnings** | Saving a recipe that uses the same items as an existing one (which Minecraft would silently ignore) asks you to replace the other recipe, save anyway, or cancel. |
 | **Undo** | Every change is recorded. **Undo** in the recipe browser (or `/remold undo`) steps back one action at a time, including bulk ones like "make unobtainable". |
 | **Permissions** | `config/remold/remold.json` sets the permission level needed, and can allow specific players who aren't operators. |
@@ -45,7 +45,7 @@ press **Save**. That's it.
 4. Put items in the slots:
    - click an item in your inventory to pick up a ghost copy, then click slots (hold to paint);
    - or **Items...** to search every item (`@modid` filters by mod);
-   - or drag from JEI / EMI.
+   - or drag from JEI / EMI / REI.
    Right-click clears a slot. Scroll over the output to change its count.
 5. **Save** (Ctrl+S). The recipe is live straight away.
 
@@ -70,7 +70,9 @@ common/     loader-agnostic code. Compiles against vanilla only, so it can't dep
   compat/     JEI and EMI plugins (optional, loaded only if the viewer is installed)
   network/    payloads (vanilla CustomPacketPayload + StreamCodec)
   platform/   RemoldPlatform: the only thing a loader has to implement
+compat-rei/ REI plugin. REI's API differs per loader, so each loader module compiles it.
 neoforge/   ~150 lines: events, payload registration, RemoldPlatform for NeoForge
+fabric/     ~200 lines: the same for Fabric API, plus one mixin accessor for the inventory position
 ```
 
 * **Recipes** are built as real recipe objects and encoded with the game's own codec, then
@@ -85,13 +87,9 @@ neoforge/   ~150 lines: events, payload registration, RemoldPlatform for NeoForg
 
 ## Porting
 
-**Fabric:** add a `fabric/` module next to `neoforge/` that
-1. implements `RemoldPlatform` (send packets, config dir, mod names,
-   `disabledRecipeJson` → `{"fabric:load_conditions":[{"condition":"fabric:not","value":{"condition":"fabric:true"}}]}`);
-2. registers the payloads in `Payloads` with `PayloadTypeRegistry` and forwards them to `ServerActions` / `RemoldClient`;
-3. forwards the same events `RemoldNeoForge` / `RemoldNeoForgeClient` do: commands, player join, server stop,
-   screen init (inventory button; needs an accessor for `leftPos`/`topPos`), item tooltip, key binding;
-4. adds the `jei_mod_plugin` and `emi` entrypoints for the classes in `compat/`.
+**Another loader:** implement `RemoldPlatform` (packets, config dir, mod names, and the JSON that
+makes the loader skip a recipe) and forward the same events as `neoforge/` and `fabric/` do:
+commands, player join, server start/stop, screen init (inventory button), item tooltips and the key binding.
 
 **Other Minecraft versions:** the version-sensitive code is in `core/RecipeFactory` (recipe
 constructors), `client/screen` (GUI API), and `Payloads`. From 1.21.2 the client no longer receives
@@ -101,13 +99,13 @@ same way templates already are). 1.20.1 has no data components, so item data wou
 ## Building
 
 ```
-./gradlew build                    # jar in neoforge/build/libs
-./gradlew :neoforge:runClient      # dev client with JEI
+./gradlew build                    # jars in neoforge/build/libs and fabric/build/libs
+./gradlew :neoforge:runClient      # NeoForge dev client with JEI
+./gradlew :fabric:runClient        # Fabric dev client with REI
 ```
 
 ## Roadmap ideas
 
-- Fabric module and REI drag-and-drop
 - Fluid slots for machine templates (fluids are editable as text values today)
 - Edit tags in-game (add items to `#c:ingots/...`)
 - Undo history and per-change diff view

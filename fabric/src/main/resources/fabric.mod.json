@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "${mod_id}",
+  "version": "${mod_version}",
+  "name": "${mod_name}",
+  "description": "${mod_description}",
+  "authors": ["${mod_authors}"],
+  "license": "${mod_license}",
+  "contact": {
+    "issues": "https://github.com/IVomens/better-crafter-thing/issues",
+    "sources": "https://github.com/IVomens/better-crafter-thing"
+  },
+  "environment": "*",
+  "entrypoints": {
+    "main": ["dev.remold.fabric.RemoldFabric"],
+    "client": ["dev.remold.fabric.RemoldFabricClient"],
+    "jei_mod_plugin": ["dev.remold.compat.jei.RemoldJeiPlugin"],
+    "emi": ["dev.remold.compat.emi.RemoldEmiPlugin"],
+    "rei_client": ["dev.remold.compat.rei.RemoldReiPlugin"]
+  },
+  "mixins": ["remold.mixins.json"],
+  "depends": {
+    "fabricloader": ">=${fabric_loader_version}",
+    "fabric-api": "*",
+    "minecraft": "~${minecraft_version}"
+  },
+  "suggests": {
+    "jei": "*",
+    "emi": "*",
+    "roughlyenoughitems": "*"
+  }
+}

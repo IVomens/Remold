@@ -32,6 +32,13 @@ ordering = "NONE"
 side = "CLIENT"
 
 [[dependencies.${mod_id}]]
+modId = "roughlyenoughitems"
+type = "optional"
+versionRange = "[16.0,)"
+ordering = "NONE"
+side = "CLIENT"
+
+[[dependencies.${mod_id}]]
 modId = "emi"
 type = "optional"
 versionRange = "[1.1,)"
