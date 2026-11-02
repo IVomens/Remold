@@ -27,13 +27,13 @@ public final class ServerActions {
     private ServerActions() {}
 
     public static boolean allowed(ServerPlayer player) {
-        return player.hasPermissions(Remold.PERMISSION_LEVEL);
+        return RemoldConfig.get().allowed(player);
     }
 
     private static boolean check(ServerPlayer player) {
         if (allowed(player)) return true;
         Remold.LOG.warn("{} tried to use Remold without permission", player.getGameProfile().getName());
-        notice(player, false, "No permission", "You need to be an operator to edit recipes.");
+        notice(player, false, "no_permission", "no_permission");
         return false;
     }
 
@@ -47,13 +47,13 @@ public final class ServerActions {
         try {
             json = JsonParser.parseString(payload.json());
         } catch (Exception e) {
-            notice(player, false, "Invalid recipe", "Malformed JSON: " + e.getMessage());
+            notice(player, false, "invalid", "invalid_json", e.getMessage());
             return;
         }
         RegistryOps<JsonElement> ops = server.registryAccess().createSerializationContext(JsonOps.INSTANCE);
         var parsed = Recipe.CODEC.parse(ops, json);
         if (parsed.error().isPresent()) {
-            notice(player, false, "Invalid recipe", parsed.error().get().message());
+            notice(player, false, "invalid", "plain", parsed.error().get().message());
             return;
         }
         RemoldPack pack = RemoldPack.get(server);
@@ -61,13 +61,14 @@ public final class ServerActions {
                 .orElse(server.getRecipeManager().byKey(id).isPresent() ? ChangeEntry.Kind.REPLACED : ChangeEntry.Kind.ADDED);
         String type = json.isJsonObject() && json.getAsJsonObject().has("type") ? json.getAsJsonObject().get("type").getAsString() : "";
         try {
+            pack.beginBatch(player.getGameProfile().getName());
             pack.writeRecipe(id, json, entry(player, id, kind, type));
         } catch (IOException e) {
             Remold.LOG.error("Could not write recipe {}", id, e);
-            notice(player, false, "Save failed", e.getMessage());
+            notice(player, false, "failed", "plain", String.valueOf(e.getMessage()));
             return;
         }
-        finish(player, payload.apply(), (kind == ChangeEntry.Kind.ADDED ? "Added " : "Replaced ") + id);
+        finish(player, payload.apply(), kind == ChangeEntry.Kind.ADDED ? "added" : "replaced", id.toString());
     }
 
     public static void handleAction(ServerPlayer player, Payloads.RecipeAction payload) {
@@ -75,28 +76,45 @@ public final class ServerActions {
         MinecraftServer server = player.server;
         RemoldPack pack = RemoldPack.get(server);
         ResourceLocation id = payload.id();
+        String name = player.getGameProfile().getName();
         try {
             switch (payload.action()) {
                 case SYNC -> sendChanges(player);
-                case APPLY -> finish(player, true, "Applying changes");
-                case REVERT -> {
-                    if (pack.revert(id)) {
-                        finish(player, payload.apply(), "Reverted " + id);
+                case APPLY -> finish(player, true, "applying_changes");
+                case UNDO -> {
+                    var result = pack.undo();
+                    if (result.isEmpty()) {
+                        notice(player, false, "nothing_to_undo", "nothing_to_undo");
+                        return;
+                    }
+                    if (result.get().annotations()) broadcastAnnotations(server);
+                    if (result.get().recipes()) {
+                        finish(player, payload.apply(), "undone", Integer.toString(result.get().changes()), result.get().author());
                     } else {
-                        notice(player, false, "Nothing to revert", id + " was not changed by Remold");
+                        notice(player, true, "done", "undone", Integer.toString(result.get().changes()), result.get().author());
+                        broadcastChanges(server);
+                    }
+                }
+                case REVERT -> {
+                    pack.beginBatch(name);
+                    if (pack.revert(id)) {
+                        finish(player, payload.apply(), "reverted", id.toString());
+                    } else {
+                        notice(player, false, "nothing_to_revert", "nothing_to_revert", id.toString());
                     }
                 }
                 case REMOVE -> {
+                    pack.beginBatch(name);
                     if (remove(player, pack, id)) {
-                        finish(player, payload.apply(), "Removed " + id);
+                        finish(player, payload.apply(), "removed", id.toString());
                     } else {
-                        notice(player, false, "Unknown recipe", "There is no recipe " + id);
+                        notice(player, false, "unknown_recipe", "unknown_recipe", id.toString());
                     }
                 }
                 case REMOVE_ALL_FOR_ITEM -> {
                     var item = BuiltInRegistries.ITEM.getOptional(id);
                     if (item.isEmpty()) {
-                        notice(player, false, "Unknown item", id.toString());
+                        notice(player, false, "unknown_item", "plain", id.toString());
                         return;
                     }
                     List<ResourceLocation> ids = new ArrayList<>();
@@ -104,13 +122,14 @@ public final class ServerActions {
                         ItemStack result = holder.value().getResultItem(server.registryAccess());
                         if (!result.isEmpty() && result.is(item.get())) ids.add(holder.id());
                     }
+                    pack.beginBatch(name);
                     for (ResourceLocation recipeId : ids) remove(player, pack, recipeId);
-                    finish(player, payload.apply(), "Removed " + ids.size() + " recipe(s) for " + id);
+                    finish(player, payload.apply(), "removed_for_item", Integer.toString(ids.size()), id.toString());
                 }
             }
         } catch (IOException e) {
             Remold.LOG.error("Remold action {} on {} failed", payload.action(), id, e);
-            notice(player, false, "Failed", e.getMessage());
+            notice(player, false, "failed", "plain", String.valueOf(e.getMessage()));
         }
     }
 
@@ -148,12 +167,14 @@ public final class ServerActions {
         if (!check(player)) return;
         try {
             RemoldPack pack = RemoldPack.get(player.server);
+            pack.beginBatch(player.getGameProfile().getName());
             pack.setAnnotation(payload.item(), payload.annotation());
             broadcastAnnotations(player.server);
-            notice(player, true, "Tooltip saved", payload.annotation().isEmpty()
-                    ? "Cleared " + payload.item() : "Updated " + payload.item());
+            broadcastChanges(player.server);
+            notice(player, true, "tooltip_saved", payload.annotation().isEmpty() ? "tooltip_cleared" : "tooltip_updated",
+                    payload.item().toString());
         } catch (IOException e) {
-            notice(player, false, "Failed", e.getMessage());
+            notice(player, false, "failed", "plain", String.valueOf(e.getMessage()));
         }
     }
 
@@ -163,39 +184,50 @@ public final class ServerActions {
         return new ChangeEntry(id, kind, type, player.getGameProfile().getName(), System.currentTimeMillis());
     }
 
-    private static void finish(ServerPlayer player, boolean apply, String what) {
+    /** Applies (reloads) if asked, keeping the operator informed. {@code what} is a notice key. */
+    private static void finish(ServerPlayer player, boolean apply, String what, String... args) {
         MinecraftServer server = player.server;
         RemoldPack pack = RemoldPack.get(server);
         if (!apply) {
-            notice(player, true, "Saved (not applied yet)", what + ". Use Apply or /reload when ready.");
+            notice(player, true, "saved_pending", what, args);
             broadcastChanges(server);
             return;
         }
         CompletableFuture<Void> future = pack.apply();
-        notice(player, true, "Applying...", what);
+        notice(player, true, "applying", what, args);
         future.whenComplete((v, err) -> server.execute(() -> {
             if (err == null) {
-                notice(player, true, "Recipes reloaded", what);
+                notice(player, true, "reloaded", what, args);
             } else {
-                notice(player, false, "Reload failed", String.valueOf(err.getMessage()));
+                notice(player, false, "reload_failed", "plain", String.valueOf(err.getMessage()));
             }
             broadcastChanges(server);
         }));
     }
 
-    public static void notice(ServerPlayer player, boolean ok, String title, String message) {
-        Services.PLATFORM.sendToPlayer(player, new Payloads.Notice(ok, title, message));
+    /**
+     * Sends a toast. Title and message are keys under {@code remold.notice.} (titles end in {@code .title}),
+     * so every player sees them in their own language.
+     */
+    public static void notice(ServerPlayer player, boolean ok, String title, String message, String... args) {
+        Services.PLATFORM.sendToPlayer(player, new Payloads.Notice(ok, "remold.notice." + title + ".title",
+                "remold.notice." + message, List.of(args)));
     }
 
     public static void sendChanges(ServerPlayer player) {
         RemoldPack pack = RemoldPack.get(player.server);
-        Services.PLATFORM.sendToPlayer(player, new Payloads.SyncChanges(pack.changes(), pack.pendingApply()));
+        Services.PLATFORM.sendToPlayer(player, new Payloads.SyncChanges(pack.changes(), pack.pendingApply(), pack.canUndo()));
     }
 
     public static void broadcastChanges(MinecraftServer server) {
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
             if (allowed(p)) sendChanges(p);
         }
+    }
+
+    public static void sendAccess(ServerPlayer player) {
+        RemoldConfig config = RemoldConfig.get();
+        Services.PLATFORM.sendToPlayer(player, new Payloads.Access(config.permissionLevel(), config.listed(player)));
     }
 
     public static void sendAnnotations(ServerPlayer player) {
@@ -208,6 +240,7 @@ public final class ServerActions {
 
     /** Call when a player joins. */
     public static void onLogin(ServerPlayer player) {
+        sendAccess(player);
         sendAnnotations(player);
         if (allowed(player)) sendChanges(player);
     }

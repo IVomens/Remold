@@ -23,6 +23,10 @@ press **Save**. That's it.
 | **Item tooltips everywhere** | Add lines like a red **ITEM UNOBTAINABLE** to an item for every player, and optionally hide it from JEI/EMI. |
 | **Make unobtainable** | One click removes every recipe (from every mod and machine) that makes an item, and tags it. |
 | **JEI / EMI** | Drag items from the item list onto the editor slots. The JEI **+** button on any recipe loads it into the editor. **R** / **U** work on editor slots. Machine icons come from the viewer's catalysts/workstations. |
+| **Conflict warnings** | Saving a recipe that uses the same items as an existing one (which Minecraft would silently ignore) asks you to replace the other recipe, save anyway, or cancel. |
+| **Undo** | Every change is recorded. **Undo** in the recipe browser (or `/remold undo`) steps back one action at a time, including bulk ones like "make unobtainable". |
+| **Permissions** | `config/remold/remold.json` sets the permission level needed, and can allow specific players who aren't operators. |
+| **Translatable** | All text is in `assets/remold/lang/`. Add a file such as `de_de.json` to translate Remold. |
 | **Batch changes** | Shift-click Save/Remove to queue changes, then **Apply** once. Reloading a big pack takes time, so this keeps it to one reload. |
 | **Plain datapack output** | Everything goes to `world/datapacks/remold/` as standard recipe JSON. Uninstall Remold and your recipes still work. |
 | **Export** | `/remold export` writes a zipped datapack plus an equivalent **KubeJS** script, for modpacks and other servers. |
@@ -30,6 +34,11 @@ press **Save**. That's it.
 ## Using it
 
 1. Be an operator (permission level 2), or open a singleplayer world with cheats on.
+   Server owners can change who may edit in `config/remold/remold.json`:
+   ```json
+   { "permission_level": 2, "allowed_players": ["Steve", "069a79f4-44e9-4726-a5be-fca90e38aaf5"] }
+   ```
+   Changes take effect on `/remold apply` or a restart.
 2. Open your inventory and click the small **crafting table** button in the top-right.
    (Or run `/remold`, or bind *Open recipe editor* in Controls.)
 3. Click **the machine bar** to choose a crafting table, a furnace, or any modded machine.
@@ -44,6 +53,7 @@ press **Save**. That's it.
 |---|---|
 | `/remold` | open the editor |
 | `/remold apply` | apply queued changes (same as `/reload`) |
+| `/remold undo` | undo the most recent change |
 | `/remold list` | list every change, with author |
 | `/remold export` | export to `remold-exports/` (datapack zip + KubeJS script) |
 

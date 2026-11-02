@@ -1,5 +1,6 @@
 package dev.remold.client.screen;
 
+import dev.remold.RemoldText;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -33,7 +34,7 @@ public class ItemPickerScreen extends Screen {
     private int cols, rows, gridX, gridY;
 
     public ItemPickerScreen(Screen parent, Consumer<ItemStack> onPick) {
-        super(Component.literal("Pick an item"));
+        super(RemoldText.tr("picker.title"));
         this.parent = parent;
         this.onPick = onPick;
     }
@@ -59,8 +60,8 @@ public class ItemPickerScreen extends Screen {
 
     @Override
     protected void init() {
-        search = new EditBox(font, width / 2 - 100, 22, 200, 16, Component.literal("Search"));
-        search.setHint(Component.literal("Search items, @mod to filter by mod").withStyle(ChatFormatting.DARK_GRAY));
+        search = new EditBox(font, width / 2 - 100, 22, 200, 16, RemoldText.tr("search"));
+        search.setHint(RemoldText.tr("picker.search").withStyle(ChatFormatting.DARK_GRAY));
         search.setResponder(s -> refresh());
         addRenderableWidget(search);
         addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, b -> onClose()).bounds(width / 2 - 50, height - 28, 100, 20).build());
@@ -113,7 +114,7 @@ public class ItemPickerScreen extends Screen {
                 g.renderItem(filtered.get(i), gridX + c * 18 + 1, gridY + r * 18 + 1);
             }
         }
-        g.drawString(font, filtered.size() + " items", gridX, gridY + rows * 18 + 4, 0x808080);
+        g.drawString(font, RemoldText.tr("picker.count", filtered.size()), gridX, gridY + rows * 18 + 4, 0x808080);
         int hovered = indexAt(mouseX, mouseY);
         if (hovered >= 0) {
             int c = (hovered % cols), r = hovered / cols - scrollRow;

@@ -13,6 +13,7 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
@@ -27,6 +28,7 @@ public class RemoldNeoForge {
         NeoForge.EVENT_BUS.addListener((PlayerEvent.PlayerLoggedInEvent e) -> {
             if (e.getEntity() instanceof ServerPlayer player) ServerActions.onLogin(player);
         });
+        NeoForge.EVENT_BUS.addListener((ServerStartingEvent e) -> RemoldPack.onServerStarting());
         NeoForge.EVENT_BUS.addListener((ServerStoppedEvent e) -> RemoldPack.onServerStopped());
         if (dist.isClient()) {
             RemoldNeoForgeClient.init(modBus);
@@ -52,6 +54,7 @@ public class RemoldNeoForge {
         registrar.playToClient(Payloads.SyncAnnotations.TYPE, Payloads.SyncAnnotations.CODEC, (p, ctx) -> RemoldClient.handle(p));
         registrar.playToClient(Payloads.SyncChanges.TYPE, Payloads.SyncChanges.CODEC, (p, ctx) -> RemoldClient.handle(p));
         registrar.playToClient(Payloads.TemplateJson.TYPE, Payloads.TemplateJson.CODEC, (p, ctx) -> RemoldClient.handle(p));
+        registrar.playToClient(Payloads.Access.TYPE, Payloads.Access.CODEC, (p, ctx) -> RemoldClient.handle(p));
         registrar.playToClient(Payloads.Notice.TYPE, Payloads.Notice.CODEC, (p, ctx) -> RemoldClient.handle(p));
     }
 }

@@ -1,5 +1,6 @@
 package dev.remold.core;
 
+import dev.remold.RemoldText;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -72,7 +73,7 @@ public final class TemplateRecipe {
         return Recipe.CODEC.encodeStart(registries.createSerializationContext(JsonOps.INSTANCE), holder.value())
                 .flatMap(json -> json.isJsonObject()
                         ? DataResult.success(new TemplateRecipe(holder.id(), json.getAsJsonObject()))
-                        : DataResult.error(() -> "Recipe is not a JSON object"));
+                        : DataResult.error(() -> RemoldText.error("not_object")));
     }
 
     public static TemplateRecipe of(ResourceLocation id, JsonObject json) {
@@ -228,7 +229,7 @@ public final class TemplateRecipe {
                     value = t.contains(".") || t.contains("e") ? new JsonPrimitive(Double.parseDouble(t)) : new JsonPrimitive(Long.parseLong(t));
                 } else value = new JsonPrimitive(raw);
             } catch (NumberFormatException e) {
-                return DataResult.error(() -> "'" + param.label() + "' must be a number");
+                return DataResult.error(() -> RemoldText.error("not_number", param.label()));
             }
             set(copy, param.path(), value);
         }
@@ -242,7 +243,7 @@ public final class TemplateRecipe {
                     continue;
                 }
                 int slot = i + 1;
-                return DataResult.error(() -> "Input slot " + slot + " cannot be empty for this machine");
+                return DataResult.error(() -> RemoldText.error("input_empty", slot));
             }
             String itemId = BuiltInRegistries.ITEM.getKey(ghost.stack().getItem()).toString();
             if (node.style() == NodeStyle.PLAIN_STRING) {
@@ -268,7 +269,7 @@ public final class TemplateRecipe {
                     removals.add(node.path());
                     continue;
                 }
-                return DataResult.error(() -> "The output cannot be empty");
+                return DataResult.error(() -> RemoldText.error("output_empty"));
             }
             String itemId = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
             if (node.style() == NodeStyle.PLAIN_STRING) {
@@ -284,7 +285,7 @@ public final class TemplateRecipe {
                     obj.remove("components");
                 } else {
                     DataResult<JsonElement> components = DataComponentPatch.CODEC.encodeStart(registries.createSerializationContext(JsonOps.INSTANCE), patch);
-                    if (components.error().isPresent()) return DataResult.error(() -> "Bad item data: " + components.error().get().message());
+                    if (components.error().isPresent()) return DataResult.error(() -> RemoldText.error("bad_item_data", components.error().get().message()));
                     obj.add("components", components.getOrThrow());
                 }
             }

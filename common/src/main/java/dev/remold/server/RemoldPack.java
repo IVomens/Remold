@@ -10,6 +10,7 @@ import com.mojang.serialization.JsonOps;
 import dev.remold.Remold;
 import dev.remold.data.Annotation;
 import dev.remold.data.ChangeEntry;
+import dev.remold.data.HistoryEntry;
 import net.minecraft.SharedConstants;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
@@ -37,6 +38,7 @@ import java.util.concurrent.CompletableFuture;
  *   pack.mcmeta
  *   remold_manifest.json      what was changed, by whom and when
  *   remold_annotations.json   item tooltips / hidden items
+ *   remold_history.json       previous versions, for undo
  *   data/&lt;namespace&gt;/recipe/&lt;path&gt;.json
  * </pre>
  * Because the result is a plain datapack, recipes keep working even if Remold is uninstalled, and
@@ -48,6 +50,8 @@ public final class RemoldPack {
     public static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 
     private static final Codec<List<ChangeEntry>> MANIFEST_CODEC = ChangeEntry.CODEC.listOf();
+    private static final int MAX_HISTORY = 1000;
+    private static final Codec<List<HistoryEntry>> HISTORY_CODEC = HistoryEntry.CODEC.listOf();
     private static final Codec<Map<ResourceLocation, Annotation>> ANNOTATIONS_CODEC =
             Codec.unboundedMap(ResourceLocation.CODEC, Annotation.CODEC);
 
@@ -55,6 +59,9 @@ public final class RemoldPack {
     private final Path root;
     private final Map<ResourceLocation, ChangeEntry> changes = new LinkedHashMap<>();
     private final Map<ResourceLocation, Annotation> annotations = new TreeMap<>();
+    private final List<HistoryEntry> history = new ArrayList<>();
+    private long batch;
+    private String batchAuthor = "";
     private boolean pendingApply;
     private CompletableFuture<Void> reloading;
     private boolean reloadQueued;
@@ -74,6 +81,10 @@ public final class RemoldPack {
         return instance;
     }
 
+    public static void onServerStarting() {
+        RemoldConfig.load();
+    }
+
     public static void onServerStopped() {
         instance = null;
     }
@@ -89,6 +100,11 @@ public final class RemoldPack {
                 MANIFEST_CODEC.parse(JsonOps.INSTANCE, json)
                         .resultOrPartial(e -> Remold.LOG.error("Bad remold_manifest.json: {}", e))
                         .ifPresent(list -> list.forEach(c -> changes.put(c.id(), c))));
+
+        readJson(root.resolve("remold_history.json")).ifPresent(json ->
+                HISTORY_CODEC.parse(JsonOps.INSTANCE, json)
+                        .resultOrPartial(e -> Remold.LOG.error("Bad remold_history.json: {}", e))
+                        .ifPresent(history::addAll));
 
         // Pack-wide defaults (shipped by modpacks) first, then the world's own annotations on top.
         Path global = dev.remold.platform.Services.PLATFORM.configDir().resolve(Remold.MOD_ID).resolve("annotations.json");
@@ -139,6 +155,76 @@ public final class RemoldPack {
                 ANNOTATIONS_CODEC.encodeStart(JsonOps.INSTANCE, annotations).getOrThrow());
     }
 
+    private void saveHistory() throws IOException {
+        while (history.size() > MAX_HISTORY) history.removeFirst();
+        writeJson(root.resolve("remold_history.json"), HISTORY_CODEC.encodeStart(JsonOps.INSTANCE, history).getOrThrow());
+    }
+
+    // ------------------------------------------------------------------ undo
+
+    /** Starts a new undo step. Everything changed until the next call is undone together. */
+    public void beginBatch(String author) {
+        batch = (history.isEmpty() ? 0 : history.getLast().batch()) + 1;
+        batchAuthor = author;
+    }
+
+    private void rememberRecipe(ResourceLocation id) throws IOException {
+        Path file = recipeFile(id);
+        Optional<String> previous = Files.isRegularFile(file)
+                ? Optional.of(Files.readString(file, StandardCharsets.UTF_8)) : Optional.empty();
+        history.add(new HistoryEntry(batch, false, id, previous, Optional.ofNullable(changes.get(id)),
+                Optional.empty(), batchAuthor, System.currentTimeMillis()));
+        ensurePack();
+        saveHistory();
+    }
+
+    private void rememberAnnotation(ResourceLocation item) throws IOException {
+        history.add(new HistoryEntry(batch, true, item, Optional.empty(), Optional.empty(),
+                Optional.ofNullable(annotations.get(item)), batchAuthor, System.currentTimeMillis()));
+        ensurePack();
+        saveHistory();
+    }
+
+    public record UndoResult(int changes, boolean recipes, boolean annotations, String author) {}
+
+    /** Undoes the most recent step (one save, removal, "make unobtainable", ...). */
+    public Optional<UndoResult> undo() throws IOException {
+        if (history.isEmpty()) return Optional.empty();
+        long last = history.getLast().batch();
+        int count = 0;
+        boolean recipes = false, notes = false;
+        String author = history.getLast().author();
+        while (!history.isEmpty() && history.getLast().batch() == last) {
+            HistoryEntry entry = history.removeLast();
+            count++;
+            if (entry.annotation()) {
+                notes = true;
+                entry.previousAnnotation().ifPresentOrElse(a -> annotations.put(entry.id(), a), () -> annotations.remove(entry.id()));
+                continue;
+            }
+            recipes = true;
+            Path file = recipeFile(entry.id());
+            if (entry.previousFile().isPresent()) {
+                Files.createDirectories(file.getParent());
+                Files.writeString(file, entry.previousFile().get(), StandardCharsets.UTF_8);
+            } else {
+                Files.deleteIfExists(file);
+            }
+            entry.previousChange().ifPresentOrElse(c -> changes.put(entry.id(), c), () -> changes.remove(entry.id()));
+        }
+        saveHistory();
+        if (recipes) {
+            saveManifest();
+            pendingApply = true;
+        }
+        if (notes) saveAnnotations();
+        return Optional.of(new UndoResult(count, recipes, notes, author));
+    }
+
+    public boolean canUndo() {
+        return !history.isEmpty();
+    }
+
     public Path recipeFile(ResourceLocation id) {
         return root.resolve("data").resolve(id.getNamespace()).resolve("recipe").resolve(id.getPath() + ".json");
     }
@@ -147,6 +233,7 @@ public final class RemoldPack {
 
     public void writeRecipe(ResourceLocation id, JsonElement json, ChangeEntry entry) throws IOException {
         ensurePack();
+        rememberRecipe(id);
         writeJson(recipeFile(id), json);
         changes.put(id, entry);
         saveManifest();
@@ -155,6 +242,7 @@ public final class RemoldPack {
 
     /** Deletes Remold's file for this id, restoring whatever the id was before. */
     public boolean revert(ResourceLocation id) throws IOException {
+        if (Files.exists(recipeFile(id)) || changes.containsKey(id)) rememberRecipe(id);
         boolean existed = Files.deleteIfExists(recipeFile(id));
         existed |= changes.remove(id) != null;
         if (existed) {
@@ -183,6 +271,7 @@ public final class RemoldPack {
     }
 
     public void setAnnotation(ResourceLocation item, Annotation annotation) throws IOException {
+        rememberAnnotation(item);
         if (annotation.isEmpty()) {
             annotations.remove(item);
         } else {

@@ -1,5 +1,6 @@
 package dev.remold.core;
 
+import dev.remold.RemoldText;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.DataResult;
@@ -43,7 +44,7 @@ public final class TemplateCache {
             JsonObject json = JsonParser.parseString(payload.json()).getAsJsonObject();
             CACHE.put(payload.id(), DataResult.success(TemplateRecipe.of(payload.id(), json)));
         } catch (Exception e) {
-            CACHE.put(payload.id(), DataResult.error(() -> "Bad template JSON: " + e.getMessage()));
+            CACHE.put(payload.id(), DataResult.error(() -> RemoldText.error("bad_template", e.getMessage())));
         }
     }
 

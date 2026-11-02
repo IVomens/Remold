@@ -1,5 +1,6 @@
 package dev.remold.client.screen;
 
+import dev.remold.RemoldText;
 import dev.remold.client.ClientState;
 import dev.remold.data.ChangeEntry;
 import dev.remold.network.Payloads;
@@ -36,21 +37,21 @@ public class RecipeBrowserScreen extends Screen {
     private boolean changesOnly;
     private EditBox search;
     private RowList list;
-    private Button edit, remove, revert;
+    private Button edit, remove, revert, undo;
     @Nullable private Row selected;
 
     record Row(ResourceLocation id, @Nullable RecipeHolder<?> holder, ItemStack icon, String type, @Nullable ChangeEntry change) {}
 
     public RecipeBrowserScreen(EditorScreen editor, String query) {
-        super(Component.literal("Recipes"));
+        super(RemoldText.tr("browser.title"));
         this.editor = editor;
         this.query = query;
     }
 
     @Override
     protected void init() {
-        search = new EditBox(font, width / 2 - 150, 22, 196, 16, Component.literal("Search"));
-        search.setHint(Component.literal("Search by output, recipe id, mod or machine").withStyle(ChatFormatting.DARK_GRAY));
+        search = new EditBox(font, width / 2 - 150, 22, 196, 16, RemoldText.tr("search"));
+        search.setHint(RemoldText.tr("browser.search").withStyle(ChatFormatting.DARK_GRAY));
         search.setValue(query);
         search.setResponder(s -> {
             query = s;
@@ -58,26 +59,29 @@ public class RecipeBrowserScreen extends Screen {
         });
         addRenderableWidget(search);
         addRenderableWidget(CycleButton.onOffBuilder(changesOnly)
-                .create(width / 2 + 50, 20, 100, 20, Component.literal("Changes"), (b, v) -> {
+                .create(width / 2 + 50, 20, 100, 20, RemoldText.tr("browser.changes"), (b, v) -> {
                     changesOnly = v;
                     refresh();
-                })).setTooltip(Tooltip.create(Component.literal("Only show recipes added, replaced or removed with Remold")));
+                })).setTooltip(Tooltip.create(RemoldText.tr("browser.changes.hint")));
 
         list = new RowList(minecraft, width, height - 80, 44, 22);
         addRenderableWidget(list);
 
         int y = height - 30;
-        int x = width / 2 - 154;
-        edit = addRenderableWidget(Button.builder(Component.literal("Edit"), b -> editSelected()).bounds(x, y, 60, 20).build());
-        edit.setTooltip(Tooltip.create(Component.literal("Load into the editor. Saving with the same id replaces the original.")));
-        remove = addRenderableWidget(Button.builder(Component.literal("Remove").withStyle(ChatFormatting.RED), b -> action(Payloads.Action.REMOVE)).bounds(x + 62, y, 60, 20).build());
-        remove.setTooltip(Tooltip.create(Component.literal("Disable this recipe. Shift-click: don't reload yet.")));
-        revert = addRenderableWidget(Button.builder(Component.literal("Restore"), b -> action(Payloads.Action.REVERT)).bounds(x + 124, y, 60, 20).build());
-        revert.setTooltip(Tooltip.create(Component.literal("Undo Remold's change to this recipe id (restores the original, or deletes a recipe Remold added)")));
-        Button apply = addRenderableWidget(Button.builder(Component.literal("Apply"), b -> Services.PLATFORM.sendToServer(Payloads.RecipeAction.simple(Payloads.Action.APPLY)))
-                .bounds(x + 186, y, 60, 20).build());
-        apply.setTooltip(Tooltip.create(Component.literal("Reload recipes so saved changes take effect")));
-        addRenderableWidget(Button.builder(CommonComponents.GUI_BACK, b -> onClose()).bounds(x + 248, y, 60, 20).build());
+        int x = width / 2 - 155;
+        edit = addRenderableWidget(Button.builder(RemoldText.tr("browser.edit"), b -> editSelected()).bounds(x, y, 50, 20).build());
+        edit.setTooltip(Tooltip.create(RemoldText.tr("browser.edit.hint")));
+        remove = addRenderableWidget(Button.builder(RemoldText.tr("browser.remove").withStyle(ChatFormatting.RED), b -> action(Payloads.Action.REMOVE)).bounds(x + 52, y, 50, 20).build());
+        remove.setTooltip(Tooltip.create(RemoldText.tr("browser.remove.hint")));
+        revert = addRenderableWidget(Button.builder(RemoldText.tr("browser.restore"), b -> action(Payloads.Action.REVERT)).bounds(x + 104, y, 50, 20).build());
+        revert.setTooltip(Tooltip.create(RemoldText.tr("browser.restore.hint")));
+        undo = addRenderableWidget(Button.builder(RemoldText.tr("browser.undo"), b -> Services.PLATFORM.sendToServer(
+                new Payloads.RecipeAction(Payloads.Action.UNDO, dev.remold.Remold.id("none"), !hasShiftDown()))).bounds(x + 156, y, 50, 20).build());
+        undo.setTooltip(Tooltip.create(RemoldText.tr("browser.undo.hint")));
+        Button apply = addRenderableWidget(Button.builder(RemoldText.tr("browser.apply"), b -> Services.PLATFORM.sendToServer(Payloads.RecipeAction.simple(Payloads.Action.APPLY)))
+                .bounds(x + 208, y, 50, 20).build());
+        apply.setTooltip(Tooltip.create(RemoldText.tr("browser.apply.hint")));
+        addRenderableWidget(Button.builder(CommonComponents.GUI_BACK, b -> onClose()).bounds(x + 260, y, 50, 20).build());
         refresh();
         setInitialFocus(search);
     }
@@ -139,6 +143,7 @@ public class RecipeBrowserScreen extends Screen {
     @Override
     public void tick() {
         super.tick();
+        undo.active = ClientState.canUndo();
         // Rows change once the server has reloaded; refresh when the data we're based on changes.
         int hash = ClientState.changes().hashCode() ^ System.identityHashCode(minecraft.level.getRecipeManager().getRecipes());
         if (hash != lastHash) {
@@ -159,7 +164,7 @@ public class RecipeBrowserScreen extends Screen {
         super.render(g, mouseX, mouseY, partialTick);
         g.drawCenteredString(font, title, width / 2, 8, 0xFFFFFF);
         if (ClientState.pendingApply()) {
-            g.drawCenteredString(font, Component.literal("Some saved changes are not applied yet - click Apply").withStyle(ChatFormatting.YELLOW), width / 2, height - 42, 0xFFFFFF);
+            g.drawCenteredString(font, RemoldText.tr("browser.pending").withStyle(ChatFormatting.YELLOW), width / 2, height - 42, 0xFFFFFF);
         }
     }
 
@@ -211,8 +216,8 @@ public class RecipeBrowserScreen extends Screen {
                     textX += 8;
                 }
                 g.drawString(font, font.plainSubstrByWidth(row.id().toString(), width - (textX - left) - 4), textX, top + 1, row.holder() == null ? 0x909090 : 0xFFFFFF);
-                String sub = row.type() + (row.holder() == null ? "  (removed)" : "  -> " + row.icon().getHoverName().getString());
-                if (row.change() != null && !row.change().author().isEmpty()) sub += "  by " + row.change().author();
+                String sub = row.type() + "  " + (row.holder() == null ? RemoldText.tr("browser.removed").getString() : "-> " + row.icon().getHoverName().getString());
+                if (row.change() != null && !row.change().author().isEmpty()) sub += "  " + RemoldText.tr("browser.by", row.change().author()).getString();
                 g.drawString(font, font.plainSubstrByWidth(sub, width - 26), left + 22, top + 11, 0x808080);
             }
 

@@ -1,5 +1,6 @@
 package dev.remold.client.screen;
 
+import dev.remold.RemoldText;
 import dev.remold.core.EditorState;
 import dev.remold.core.TemplateRecipe;
 import net.minecraft.ChatFormatting;
@@ -18,7 +19,7 @@ public class ParamsScreen extends Screen {
     private int page;
 
     public ParamsScreen(EditorScreen editor) {
-        super(Component.literal("Recipe values"));
+        super(RemoldText.tr("values.title"));
         this.editor = editor;
     }
 
@@ -62,7 +63,7 @@ public class ParamsScreen extends Screen {
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         super.render(g, mouseX, mouseY, partialTick);
         g.drawCenteredString(font, title, width / 2, 8, 0xFFFFFF);
-        g.drawCenteredString(font, Component.literal("Values copied from the template recipe. Invalid values are rejected when saving.").withStyle(ChatFormatting.GRAY), width / 2, 18, 0xFFFFFF);
+        g.drawCenteredString(font, RemoldText.tr("values.hint").withStyle(ChatFormatting.GRAY), width / 2, 18, 0xFFFFFF);
         EditorState state = editor.state;
         if (state.template == null) return;
         List<TemplateRecipe.Param> params = state.template.params;

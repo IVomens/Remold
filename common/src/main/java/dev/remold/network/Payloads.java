@@ -51,7 +51,9 @@ public final class Payloads {
         /** Ask the server for the current change list. Id is ignored. */
         SYNC,
         /** Remove every recipe that produces the item with this id. */
-        REMOVE_ALL_FOR_ITEM
+        REMOVE_ALL_FOR_ITEM,
+        /** Undo the most recent change. Id is ignored. */
+        UNDO
     }
 
     public record RecipeAction(Action action, ResourceLocation id, boolean apply) implements CustomPacketPayload {
@@ -141,11 +143,12 @@ public final class Payloads {
         }
     }
 
-    public record SyncChanges(List<ChangeEntry> changes, boolean pendingApply) implements CustomPacketPayload {
+    public record SyncChanges(List<ChangeEntry> changes, boolean pendingApply, boolean canUndo) implements CustomPacketPayload {
         public static final Type<SyncChanges> TYPE = Payloads.typeOf("sync_changes");
         public static final StreamCodec<ByteBuf, SyncChanges> CODEC = StreamCodec.composite(
                 ChangeEntry.STREAM_CODEC.apply(ByteBufCodecs.list()), SyncChanges::changes,
                 ByteBufCodecs.BOOL, SyncChanges::pendingApply,
+                ByteBufCodecs.BOOL, SyncChanges::canUndo,
                 SyncChanges::new);
 
         @Override
@@ -154,13 +157,28 @@ public final class Payloads {
         }
     }
 
-    /** Feedback for the operator, shown as a toast. */
-    public record Notice(boolean success, String title, String message) implements CustomPacketPayload {
+    /** Who may edit on this server, so the client knows whether to show the inventory button. */
+    public record Access(int permissionLevel, boolean listed) implements CustomPacketPayload {
+        public static final Type<Access> TYPE = Payloads.typeOf("access");
+        public static final StreamCodec<ByteBuf, Access> CODEC = StreamCodec.composite(
+                ByteBufCodecs.VAR_INT, Access::permissionLevel,
+                ByteBufCodecs.BOOL, Access::listed,
+                Access::new);
+
+        @Override
+        public Type<Access> type() {
+            return TYPE;
+        }
+    }
+
+    /** Feedback for the operator, shown as a toast. Title and message are translation keys. */
+    public record Notice(boolean success, String title, String message, List<String> args) implements CustomPacketPayload {
         public static final Type<Notice> TYPE = Payloads.typeOf("notice");
         public static final StreamCodec<ByteBuf, Notice> CODEC = StreamCodec.composite(
                 ByteBufCodecs.BOOL, Notice::success,
                 ByteBufCodecs.STRING_UTF8, Notice::title,
                 ByteBufCodecs.STRING_UTF8, Notice::message,
+                ByteBufCodecs.STRING_UTF8.apply(ByteBufCodecs.list(8)), Notice::args,
                 Notice::new);
 
         @Override

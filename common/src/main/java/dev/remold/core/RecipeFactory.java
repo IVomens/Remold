@@ -1,5 +1,6 @@
 package dev.remold.core;
 
+import dev.remold.RemoldText;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.mojang.serialization.DataResult;
@@ -74,7 +75,7 @@ public final class RecipeFactory {
         Machine machine = state.machine;
         if (machine.examples().isEmpty()) {
             state.template = null;
-            state.templateError = "This machine has no recipes to use as a template";
+            state.templateError = RemoldText.error("no_examples");
             state.inputs = EditorState.empty(0);
             state.outputs = new ItemStack[0];
             return;
@@ -84,7 +85,7 @@ public final class RecipeFactory {
         var pending = TemplateCache.get(machine.examples().get(i).id());
         if (pending.isEmpty()) {
             state.template = null;
-            state.templateError = "Loading template from the server...";
+            state.templateError = RemoldText.error("loading_template");
             state.inputs = EditorState.empty(0);
             state.outputs = new ItemStack[0];
             return;
@@ -92,7 +93,7 @@ public final class RecipeFactory {
         DataResult<TemplateRecipe> result = pending.get();
         if (result.error().isPresent()) {
             state.template = null;
-            state.templateError = "Can't use " + machine.examples().get(i).id() + " as a template: " + result.error().get().message();
+            state.templateError = RemoldText.error("bad_example", machine.examples().get(i).id(), result.error().get().message());
             state.inputs = EditorState.empty(0);
             state.outputs = new ItemStack[0];
             return;
@@ -110,11 +111,11 @@ public final class RecipeFactory {
     public static DataResult<JsonObject> build(EditorState state, HolderLookup.Provider registries) {
         Machine.Kind kind = state.machine.kind();
         if (kind == Machine.Kind.TEMPLATE) {
-            if (state.template == null) return DataResult.error(() -> Objects.requireNonNullElse(state.templateError, "No template"));
+            if (state.template == null) return DataResult.error(() -> Objects.requireNonNullElse(state.templateError, RemoldText.error("no_template")));
             return state.template.build(state.inputs, state.outputs, state.params, registries).flatMap(json -> validate(json, registries));
         }
         ItemStack output = state.output();
-        if (output.isEmpty()) return DataResult.error(() -> "Choose an output item");
+        if (output.isEmpty()) return DataResult.error(() -> RemoldText.error("no_output"));
         String group = state.group;
         Recipe<?> recipe;
         try {
@@ -123,7 +124,7 @@ public final class RecipeFactory {
                 case SHAPELESS -> {
                     NonNullList<Ingredient> list = NonNullList.create();
                     for (GhostIngredient g : state.inputs) if (!g.isEmpty()) list.add(g.toIngredient());
-                    if (list.isEmpty()) throw new IllegalArgumentException("Add at least one input item");
+                    if (list.isEmpty()) throw new IllegalArgumentException(RemoldText.error("no_inputs"));
                     yield new ShapelessRecipe(group, CraftingBookCategory.MISC, output.copy(), list);
                 }
                 case SMELTING -> new SmeltingRecipe(group, CookingBookCategory.MISC, single(state), output.copy(), state.experience, state.cookTime);
@@ -132,7 +133,7 @@ public final class RecipeFactory {
                 case CAMPFIRE -> new CampfireCookingRecipe(group, CookingBookCategory.FOOD, single(state), output.copy(), state.experience, state.cookTime);
                 case STONECUTTING -> new StonecutterRecipe(group, single(state), output.copy());
                 case SMITHING -> {
-                    if (state.inputs[1].isEmpty()) throw new IllegalArgumentException("The smithing base (middle slot) is required");
+                    if (state.inputs[1].isEmpty()) throw new IllegalArgumentException(RemoldText.error("no_smithing_base"));
                     yield new SmithingTransformRecipe(state.inputs[0].toIngredient(), state.inputs[1].toIngredient(), state.inputs[2].toIngredient(), output.copy());
                 }
                 case TEMPLATE -> throw new IllegalStateException();
@@ -141,12 +142,12 @@ public final class RecipeFactory {
             return DataResult.error(e::getMessage);
         }
         return Recipe.CODEC.encodeStart(registries.createSerializationContext(JsonOps.INSTANCE), recipe)
-                .flatMap(json -> json.isJsonObject() ? DataResult.success(json.getAsJsonObject()) : DataResult.error(() -> "Not an object"))
+                .flatMap(json -> json.isJsonObject() ? DataResult.success(json.getAsJsonObject()) : DataResult.error(() -> RemoldText.error("not_object")))
                 .flatMap(json -> validate(json, registries));
     }
 
     private static Ingredient single(EditorState state) {
-        if (state.inputs[0].isEmpty()) throw new IllegalArgumentException("Choose an input item");
+        if (state.inputs[0].isEmpty()) throw new IllegalArgumentException(RemoldText.error("no_input"));
         return state.inputs[0].toIngredient();
     }
 
@@ -161,7 +162,7 @@ public final class RecipeFactory {
             maxX = Math.max(maxX, x);
             maxY = Math.max(maxY, y);
         }
-        if (maxX < 0) throw new IllegalArgumentException("Add at least one input item");
+        if (maxX < 0) throw new IllegalArgumentException(RemoldText.error("no_inputs"));
         Map<String, Character> symbols = new LinkedHashMap<>();
         Map<Character, Ingredient> key = new HashMap<>();
         List<String> pattern = new ArrayList<>();
@@ -276,10 +277,10 @@ public final class RecipeFactory {
     /** Parses what the operator typed. Ids without a namespace go in {@code remold:}. */
     public static DataResult<ResourceLocation> parseId(String text) {
         String t = text.trim().toLowerCase(Locale.ROOT);
-        if (t.isEmpty()) return DataResult.error(() -> "Enter a recipe id");
+        if (t.isEmpty()) return DataResult.error(() -> RemoldText.error("no_id"));
         if (!t.contains(":")) t = Remold.MOD_ID + ":" + t;
         String finalT = t;
         ResourceLocation id = ResourceLocation.tryParse(t);
-        return id == null ? DataResult.error(() -> "'" + finalT + "' is not a valid id (use a-z, 0-9, _ - . /)") : DataResult.success(id);
+        return id == null ? DataResult.error(() -> RemoldText.error("bad_id", finalT)) : DataResult.success(id);
     }
 }

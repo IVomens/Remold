@@ -1,5 +1,6 @@
 package dev.remold.client;
 
+import dev.remold.RemoldText;
 import dev.remold.Remold;
 import dev.remold.client.screen.EditorMenu;
 import dev.remold.client.screen.EditorScreen;
@@ -35,14 +36,14 @@ public final class RemoldClient {
 
     public static boolean canEdit() {
         Minecraft mc = Minecraft.getInstance();
-        return mc.player != null && mc.player.hasPermissions(Remold.PERMISSION_LEVEL);
+        return mc.player != null && ClientState.canEdit(mc.player);
     }
 
     public static void openEditor(@Nullable Screen parent) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
         if (!canEdit()) {
-            toast(false, "Remold", "Only operators can edit recipes.");
+            toast(false, RemoldText.tr("name"), RemoldText.tr("notice.no_permission"));
             return;
         }
         Services.PLATFORM.sendToServer(Payloads.RecipeAction.simple(Payloads.Action.SYNC));
@@ -61,7 +62,7 @@ public final class RemoldClient {
     }
 
     public static void handle(Payloads.SyncChanges payload) {
-        ClientState.setChanges(payload.changes(), payload.pendingApply());
+        ClientState.setChanges(payload.changes(), payload.pendingApply(), payload.canUndo());
         TemplateCache.clear();
     }
 
@@ -72,14 +73,19 @@ public final class RemoldClient {
         }
     }
 
-    public static void handle(Payloads.Notice payload) {
-        toast(payload.success(), payload.title(), payload.message());
+    public static void handle(Payloads.Access payload) {
+        ClientState.setAccess(payload.permissionLevel(), payload.listed());
     }
 
-    public static void toast(boolean success, String title, String message) {
+    public static void handle(Payloads.Notice payload) {
+        toast(payload.success(), Component.translatable(payload.title()),
+                Component.translatable(payload.message(), payload.args().toArray()));
+    }
+
+    public static void toast(boolean success, Component title, Component message) {
         Minecraft mc = Minecraft.getInstance();
-        Component t = Component.literal(title).withStyle(success ? ChatFormatting.GREEN : ChatFormatting.RED);
-        mc.getToasts().addToast(SystemToast.multiline(mc, TOAST, t, Component.literal(message)));
+        Component t = title.copy().withStyle(success ? ChatFormatting.GREEN : ChatFormatting.RED);
+        mc.getToasts().addToast(SystemToast.multiline(mc, TOAST, t, message));
     }
 
     // ------------------------------------------------------------------ tooltips
@@ -118,10 +124,10 @@ public final class RemoldClient {
             return null;
         }
         ItemStack icon = new ItemStack(Items.CRAFTING_TABLE);
-        Tooltip tooltip = Tooltip.create(Component.literal("Remold: recipe editor").withStyle(ChatFormatting.GOLD)
-                .append(Component.literal("\nCreate, change or remove recipes").withStyle(ChatFormatting.GRAY)));
+        Tooltip tooltip = Tooltip.create(RemoldText.tr("button.title").withStyle(ChatFormatting.GOLD)
+                .append(Component.literal("\n")).append(RemoldText.tr("button.description").withStyle(ChatFormatting.GRAY)));
         IconButton button = new IconButton(guiLeft.getAsInt() + dx, guiTop.getAsInt() + dy, size, size,
-                Component.literal("Remold"), () -> icon, true, b -> openEditor(screen)) {
+                RemoldText.tr("name"), () -> icon, true, b -> openEditor(screen)) {
             @Override
             public void renderWidget(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
                 setX(guiLeft.getAsInt() + dx);
