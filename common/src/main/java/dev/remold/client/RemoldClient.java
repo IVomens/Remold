@@ -62,7 +62,7 @@ public final class RemoldClient {
     }
 
     public static void handle(Payloads.SyncChanges payload) {
-        ClientState.setChanges(payload.changes(), payload.pendingApply(), payload.canUndo(), payload.tagEdits());
+        ClientState.setChanges(payload.changes(), payload.pendingApply(), payload.canUndo(), payload.tagEdits(), payload.unify());
         TemplateCache.clear();
     }
 

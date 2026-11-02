@@ -4,6 +4,7 @@ import dev.remold.Remold;
 import dev.remold.data.Annotation;
 import dev.remold.data.ChangeEntry;
 import dev.remold.data.TagEdit;
+import dev.remold.data.UnifySettings;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
@@ -144,6 +145,20 @@ public final class Payloads {
         }
     }
 
+    /** Unify items: for each tag in the settings, make every recipe produce the preferred item. */
+    public record Unify(UnifySettings settings, boolean apply) implements CustomPacketPayload {
+        public static final Type<Unify> TYPE = Payloads.typeOf("unify");
+        public static final StreamCodec<ByteBuf, Unify> CODEC = StreamCodec.composite(
+                UnifySettings.STREAM_CODEC, Unify::settings,
+                ByteBufCodecs.BOOL, Unify::apply,
+                Unify::new);
+
+        @Override
+        public Type<Unify> type() {
+            return TYPE;
+        }
+    }
+
     /** Ask the server for a recipe's original JSON, to use as a template for a machine. */
     public record RequestTemplate(ResourceLocation id) implements CustomPacketPayload {
         public static final Type<RequestTemplate> TYPE = Payloads.typeOf("request_template");
@@ -200,7 +215,7 @@ public final class Payloads {
     }
 
     public record SyncChanges(List<ChangeEntry> changes, boolean pendingApply, boolean canUndo,
-                              Map<ResourceLocation, TagEdit> tagEdits) implements CustomPacketPayload {
+                              Map<ResourceLocation, TagEdit> tagEdits, UnifySettings unify) implements CustomPacketPayload {
         public static final Type<SyncChanges> TYPE = Payloads.typeOf("sync_changes");
         public static final StreamCodec<ByteBuf, SyncChanges> CODEC = StreamCodec.composite(
                 ChangeEntry.STREAM_CODEC.apply(ByteBufCodecs.list()), SyncChanges::changes,
@@ -208,6 +223,7 @@ public final class Payloads {
                 ByteBufCodecs.BOOL, SyncChanges::canUndo,
                 ByteBufCodecs.<ByteBuf, ResourceLocation, TagEdit, Map<ResourceLocation, TagEdit>>map(HashMap::new,
                         ResourceLocation.STREAM_CODEC, TagEdit.STREAM_CODEC), SyncChanges::tagEdits,
+                UnifySettings.STREAM_CODEC, SyncChanges::unify,
                 SyncChanges::new);
 
         @Override

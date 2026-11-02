@@ -331,6 +331,26 @@ public final class TemplateRecipe {
         return changed ? copy : null;
     }
 
+    /**
+     * A copy of this recipe where ingredients that ask for exactly one of {@code items} accept the
+     * whole {@code tag} instead, or null if nothing changed.
+     */
+    @org.jetbrains.annotations.Nullable
+    public JsonObject widenToTag(Set<String> items, String tag) {
+        JsonObject copy = json.deepCopy();
+        boolean changed = false;
+        for (Node node : inputs) {
+            if (node.style() != NodeStyle.INGREDIENT_ITEM) continue;
+            JsonObject obj = get(copy, node.path()).getAsJsonObject();
+            if (obj.has("item") && items.contains(obj.get("item").getAsString())) {
+                obj.remove("item");
+                obj.addProperty("tag", tag);
+                changed = true;
+            }
+        }
+        return changed ? copy : null;
+    }
+
     // ------------------------------------------------------------------ json paths
 
     static JsonElement get(JsonElement root, List<Object> path) {

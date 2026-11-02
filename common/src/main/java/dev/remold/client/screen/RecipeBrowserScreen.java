@@ -71,6 +71,8 @@ public class RecipeBrowserScreen extends Screen {
                 .bounds(x0, 4, 60, 16).build()).setTooltip(Tooltip.create(RemoldText.tr("browser.tags.hint")));
         addRenderableWidget(Button.builder(RemoldText.tr("browser.import"), b -> minecraft.setScreen(new ImportScreen(this)))
                 .bounds(x0 + 64, 4, 60, 16).build()).setTooltip(Tooltip.create(RemoldText.tr("browser.import.hint")));
+        addRenderableWidget(Button.builder(RemoldText.tr("browser.unify"), b -> minecraft.setScreen(new UnifyScreen(this)))
+                .bounds(x0 + 240, 4, 60, 16).build()).setTooltip(Tooltip.create(RemoldText.tr("browser.unify.hint")));
         addRenderableWidget(Button.builder(RemoldText.tr("browser.bulk"), b -> minecraft.setScreen(new BulkScreen(this)))
                 .bounds(x0 + 304, 4, 60, 16).build()).setTooltip(Tooltip.create(RemoldText.tr("browser.bulk.hint")));
 

@@ -270,6 +270,11 @@ public final class ServerActions {
         }
     }
 
+    public static void handleUnify(ServerPlayer player, Payloads.Unify payload) {
+        if (!check(player)) return;
+        Unifier.apply(player, payload);
+    }
+
     public static void handleImport(ServerPlayer player, Payloads.ImportRequest payload) {
         if (!check(player)) return;
         if (!payload.file().isEmpty()) Importer.run(player, payload.file(), payload.apply());
@@ -310,6 +315,7 @@ public final class ServerActions {
         CompletableFuture<Void> future = pack.apply();
         notice(player, true, "applying", what, args);
         future.whenComplete((v, err) -> server.execute(() -> {
+            Unifier.invalidate();
             if (err == null) {
                 notice(player, true, "reloaded", what, args);
             } else {
@@ -330,7 +336,7 @@ public final class ServerActions {
 
     public static void sendChanges(ServerPlayer player) {
         RemoldPack pack = RemoldPack.get(player.server);
-        Services.PLATFORM.sendToPlayer(player, new Payloads.SyncChanges(pack.changes(), pack.pendingApply(), pack.canUndo(), pack.tagEdits()));
+        Services.PLATFORM.sendToPlayer(player, new Payloads.SyncChanges(pack.changes(), pack.pendingApply(), pack.canUndo(), pack.tagEdits(), pack.unify()));
     }
 
     public static void broadcastChanges(MinecraftServer server) {

@@ -49,7 +49,15 @@ public final class ClientState {
         return canUndo;
     }
 
-    public static void setChanges(List<ChangeEntry> list, boolean pending, boolean undo, Map<ResourceLocation, dev.remold.data.TagEdit> tags) {
+    private static dev.remold.data.UnifySettings unify = dev.remold.data.UnifySettings.EMPTY;
+
+    public static dev.remold.data.UnifySettings unify() {
+        return unify;
+    }
+
+    public static void setChanges(List<ChangeEntry> list, boolean pending, boolean undo, Map<ResourceLocation, dev.remold.data.TagEdit> tags,
+                                  dev.remold.data.UnifySettings unifySettings) {
+        unify = unifySettings;
         tagEdits = Map.copyOf(tags);
         changes = List.copyOf(list);
         pendingApply = pending;
@@ -73,6 +81,7 @@ public final class ClientState {
         pendingApply = false;
         canUndo = false;
         tagEdits = Map.of();
+        unify = dev.remold.data.UnifySettings.EMPTY;
         dev.remold.core.TemplateCache.clear();
     }
 }

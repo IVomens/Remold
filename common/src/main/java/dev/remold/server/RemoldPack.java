@@ -12,6 +12,7 @@ import dev.remold.data.Annotation;
 import dev.remold.data.ChangeEntry;
 import dev.remold.data.HistoryEntry;
 import dev.remold.data.TagEdit;
+import dev.remold.data.UnifySettings;
 import net.minecraft.SharedConstants;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
@@ -41,6 +42,7 @@ import java.util.concurrent.CompletableFuture;
  *   remold_annotations.json   item tooltips / hidden items
  *   remold_history.json       previous versions, for undo
  *   remold_tags.json          tag edits
+ *   remold_unify.json         item unification settings
  *   data/&lt;namespace&gt;/tags/item/&lt;path&gt;.json
  *   data/&lt;namespace&gt;/recipe/&lt;path&gt;.json
  * </pre>
@@ -66,6 +68,8 @@ public final class RemoldPack {
     private final Map<ResourceLocation, Annotation> annotations = new TreeMap<>();
     private final List<HistoryEntry> history = new ArrayList<>();
     private final Map<ResourceLocation, TagEdit> tagEdits = new TreeMap<>();
+    private UnifySettings unify = UnifySettings.EMPTY;
+    private static final String UNIFY_FILE = "remold_unify.json";
     private long batch;
     private String batchAuthor = "";
     private boolean pendingApply;
@@ -89,6 +93,10 @@ public final class RemoldPack {
 
     public static void onServerStarting() {
         RemoldConfig.load();
+    }
+
+    public static void onServerTick(MinecraftServer server) {
+        Unifier.tick(server);
     }
 
     public static void onServerStopped() {
@@ -116,6 +124,8 @@ public final class RemoldPack {
                 TAGS_CODEC.parse(JsonOps.INSTANCE, json)
                         .resultOrPartial(e -> Remold.LOG.error("Bad remold_tags.json: {}", e))
                         .ifPresent(tagEdits::putAll));
+
+        loadUnify();
 
         // Pack-wide defaults (shipped by modpacks) first, then the world's own annotations on top.
         Path global = dev.remold.platform.Services.PLATFORM.configDir().resolve(Remold.MOD_ID).resolve("annotations.json");
@@ -184,14 +194,14 @@ public final class RemoldPack {
         Optional<String> previous = Files.isRegularFile(file)
                 ? Optional.of(Files.readString(file, StandardCharsets.UTF_8)) : Optional.empty();
         history.add(new HistoryEntry(batch, false, id, previous, Optional.ofNullable(changes.get(id)),
-                Optional.empty(), batchAuthor, System.currentTimeMillis(), false, Optional.empty()));
+                Optional.empty(), batchAuthor, System.currentTimeMillis(), false, Optional.empty(), Optional.empty()));
         ensurePack();
         saveHistory();
     }
 
     private void rememberAnnotation(ResourceLocation item) throws IOException {
         history.add(new HistoryEntry(batch, true, item, Optional.empty(), Optional.empty(),
-                Optional.ofNullable(annotations.get(item)), batchAuthor, System.currentTimeMillis(), false, Optional.empty()));
+                Optional.ofNullable(annotations.get(item)), batchAuthor, System.currentTimeMillis(), false, Optional.empty(), Optional.empty()));
         ensurePack();
         saveHistory();
     }
@@ -201,9 +211,35 @@ public final class RemoldPack {
         Optional<String> previous = Files.isRegularFile(file)
                 ? Optional.of(Files.readString(file, StandardCharsets.UTF_8)) : Optional.empty();
         history.add(new HistoryEntry(batch, false, tag, previous, Optional.empty(), Optional.empty(),
-                batchAuthor, System.currentTimeMillis(), true, Optional.ofNullable(tagEdits.get(tag))));
+                batchAuthor, System.currentTimeMillis(), true, Optional.ofNullable(tagEdits.get(tag)), Optional.empty()));
         ensurePack();
         saveHistory();
+    }
+
+    private void loadUnify() {
+        unify = readJson(root.resolve(UNIFY_FILE))
+                .flatMap(json -> UnifySettings.CODEC.parse(JsonOps.INSTANCE, json)
+                        .resultOrPartial(e -> Remold.LOG.error("Bad {}: {}", UNIFY_FILE, e)))
+                .orElse(UnifySettings.EMPTY);
+        Unifier.invalidate();
+    }
+
+    public UnifySettings unify() {
+        return unify;
+    }
+
+    /** Stores the unification settings (undoable with the rest of the current batch). */
+    public void setUnify(UnifySettings settings) throws IOException {
+        ensurePack();
+        Path file = root.resolve(UNIFY_FILE);
+        Optional<String> previous = Files.isRegularFile(file)
+                ? Optional.of(Files.readString(file, StandardCharsets.UTF_8)) : Optional.empty();
+        history.add(new HistoryEntry(batch, false, Remold.id("unify"), previous, Optional.empty(), Optional.empty(),
+                batchAuthor, System.currentTimeMillis(), false, Optional.empty(), Optional.of(UNIFY_FILE)));
+        saveHistory();
+        unify = settings;
+        Unifier.invalidate();
+        writeJson(file, UnifySettings.CODEC.encodeStart(JsonOps.INSTANCE, settings).getOrThrow());
     }
 
     public record UndoResult(int changes, boolean recipes, boolean annotations, String author) {}
@@ -218,6 +254,14 @@ public final class RemoldPack {
         while (!history.isEmpty() && history.getLast().batch() == last) {
             HistoryEntry entry = history.removeLast();
             count++;
+            if (entry.configFile().isPresent()) {
+                Path file = root.resolve(entry.configFile().get());
+                if (entry.previousFile().isPresent()) Files.writeString(file, entry.previousFile().get(), StandardCharsets.UTF_8);
+                else Files.deleteIfExists(file);
+                loadUnify();
+                notes = true;
+                continue;
+            }
             if (entry.annotation()) {
                 notes = true;
                 entry.previousAnnotation().ifPresentOrElse(a -> annotations.put(entry.id(), a), () -> annotations.remove(entry.id()));

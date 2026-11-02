@@ -27,6 +27,7 @@ public class RemoldFabric implements ModInitializer {
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> ServerActions.onLogin(handler.getPlayer()));
         ServerLifecycleEvents.SERVER_STARTING.register(server -> RemoldPack.onServerStarting());
         ServerLifecycleEvents.SERVER_STOPPED.register(server -> RemoldPack.onServerStopped());
+        net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents.END_SERVER_TICK.register(RemoldPack::onServerTick);
     }
 
     private static void registerPayloads() {
@@ -35,6 +36,7 @@ public class RemoldFabric implements ModInitializer {
         toServer(Payloads.SetAnnotation.TYPE, Payloads.SetAnnotation.CODEC, ServerActions::handleAnnotation);
         toServer(Payloads.SetTag.TYPE, Payloads.SetTag.CODEC, ServerActions::handleTag);
         toServer(Payloads.Bulk.TYPE, Payloads.Bulk.CODEC, ServerActions::handleBulk);
+        toServer(Payloads.Unify.TYPE, Payloads.Unify.CODEC, ServerActions::handleUnify);
         toServer(Payloads.ImportRequest.TYPE, Payloads.ImportRequest.CODEC, ServerActions::handleImport);
         toServer(Payloads.RequestTemplate.TYPE, Payloads.RequestTemplate.CODEC, ServerActions::handleTemplateRequest);
 
