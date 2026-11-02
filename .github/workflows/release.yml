@@ -1,0 +1,79 @@
+name: Release
+
+# Publish a release in either of two ways:
+#   - Actions tab > Release > Run workflow, and enter the version (e.g. 0.1.0-beta.1); the tag
+#     v<version> is created on the commit the workflow runs on
+#   - or push a version tag: git tag v0.1.0-beta.1 && git push origin v0.1.0-beta.1
+# Versions with a "-" (beta, alpha, rc) become pre-releases. Release notes are the matching
+# "## <version>" section of CHANGELOG.md.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release, without the "v" (e.g. 0.1.0-beta.1)
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ -n "$INPUT_VERSION" ]; then version="${INPUT_VERSION#v}"; else version="${GITHUB_REF_NAME#v}"; fi
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then echo "Bad version: $version"; exit 1; fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          echo "mc=$(grep '^minecraft_version=' gradle.properties | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+          if [[ "$version" == *-* ]]; then echo "prerelease=true" >> "$GITHUB_OUTPUT"; else echo "prerelease=false" >> "$GITHUB_OUTPUT"; fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build
+        run: ./gradlew build -Pmod_version=${{ steps.version.outputs.version }}
+
+      - name: Collect jars
+        run: |
+          mkdir dist
+          cp neoforge/build/libs/*.jar fabric/build/libs/*.jar dist/
+          rm -f dist/*-sources.jar
+          ls -l dist
+
+      - name: Release notes
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          awk -v v="## $VERSION" '$0 == v {found=1; next} found && /^## / {exit} found {print}' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then echo "Remold $VERSION" > notes.md; fi
+          cat notes.md
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          MC: ${{ steps.version.outputs.mc }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          flags=""
+          if [ "$PRERELEASE" = "true" ]; then flags="--prerelease"; fi
+          # Creates the tag on this commit if it doesn't exist yet (manual runs).
+          gh release create "$TAG" dist/*.jar $flags --target "$GITHUB_SHA" \
+            --title "Remold $VERSION for Minecraft $MC" \
+            --notes-file notes.md
