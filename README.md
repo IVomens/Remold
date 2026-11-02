@@ -104,6 +104,12 @@ same way templates already are). 1.20.1 has no data components, so item data wou
 ./gradlew :fabric:runClient        # Fabric dev client with REI
 ```
 
+### Nightly builds
+
+`.github/workflows/nightly.yml` builds both jars every night at 03:17 UTC and publishes them as the
+rolling **nightly** pre-release on the Releases page, versioned like `0.1.0-nightly.20261102.abc1234`.
+Nights without new commits are skipped. Run it any time from the Actions tab with **Run workflow**.
+
 ## Roadmap ideas
 
 - Fluid slots for machine templates (fluids are editable as text values today)
