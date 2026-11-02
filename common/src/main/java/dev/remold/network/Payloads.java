@@ -86,7 +86,36 @@ public final class Payloads {
         }
     }
 
+    /** Ask the server for a recipe's original JSON, to use as a template for a machine. */
+    public record RequestTemplate(ResourceLocation id) implements CustomPacketPayload {
+        public static final Type<RequestTemplate> TYPE = Payloads.typeOf("request_template");
+        public static final StreamCodec<ByteBuf, RequestTemplate> CODEC = ResourceLocation.STREAM_CODEC.map(RequestTemplate::new, RequestTemplate::id);
+
+        @Override
+        public Type<RequestTemplate> type() {
+            return TYPE;
+        }
+    }
+
     // ---------------------------------------------------------------- server -> client
+
+    /**
+     * A recipe as JSON, encoded on the server. Recipes on the client are network copies that have
+     * lost details (tags are expanded, shaped patterns lose their keys), so templates come from here.
+     */
+    public record TemplateJson(ResourceLocation id, String json, String error) implements CustomPacketPayload {
+        public static final Type<TemplateJson> TYPE = Payloads.typeOf("template_json");
+        public static final StreamCodec<ByteBuf, TemplateJson> CODEC = StreamCodec.composite(
+                ResourceLocation.STREAM_CODEC, TemplateJson::id,
+                ByteBufCodecs.stringUtf8(1 << 20), TemplateJson::json,
+                ByteBufCodecs.STRING_UTF8, TemplateJson::error,
+                TemplateJson::new);
+
+        @Override
+        public Type<TemplateJson> type() {
+            return TYPE;
+        }
+    }
 
     public record OpenEditor() implements CustomPacketPayload {
         public static final OpenEditor INSTANCE = new OpenEditor();

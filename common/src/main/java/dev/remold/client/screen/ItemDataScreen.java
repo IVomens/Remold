@@ -29,7 +29,7 @@ import java.util.function.Consumer;
  * (e.g. a red "ITEM UNOBTAINABLE"), enchantment glint, rarity, unbreakable, model data and count.
  */
 public class ItemDataScreen extends Screen {
-    private static final int LORE_LINES = 5;
+    private static final int LORE_LINES = 4;
 
     enum Toggle { DEFAULT, ON, OFF }
 
@@ -71,15 +71,15 @@ public class ItemDataScreen extends Screen {
     protected void init() {
         int x0 = width / 2 - 110;
         int y = 30;
-        name = box(x0 + 24, y, 196, nameValue, "Custom name, e.g. &6Golden Sword");
+        name = box(x0 + 24, y + 1, 196, nameValue, "Custom name, e.g. &6Golden Sword");
         name.setResponder(s -> nameValue = s);
-        y += 24;
+        y += 22;
         for (int i = 0; i < LORE_LINES; i++) {
             int line = i;
             lore[i] = box(x0, y + 10 + i * 18, 220, loreValues[i], i == 0 ? "Lore line, e.g. &c&lITEM UNOBTAINABLE" : "");
             lore[i].setResponder(s -> loreValues[line] = s);
         }
-        y += 10 + LORE_LINES * 18 + 6;
+        y += 10 + LORE_LINES * 18 + 2;
         count = box(x0 + 40, y, 40, countValue, "");
         count.setFilter(s -> s.matches("\\d{0,2}"));
         count.setResponder(s -> countValue = s);
@@ -87,20 +87,20 @@ public class ItemDataScreen extends Screen {
         modelData.setFilter(s -> s.matches("-?\\d{0,9}"));
         modelData.setResponder(s -> modelValue = s);
         modelData.setTooltip(Tooltip.create(Component.literal("Custom model data, for resource packs")));
-        y += 22;
+        y += 20;
 
-        addRenderableWidget(CycleButton.<Toggle>builder(t -> Component.literal(cap(t.name())))
+        addRenderableWidget(CycleButton.<Toggle>builder(t -> Component.literal(t == Toggle.DEFAULT ? "Auto" : cap(t.name())))
                 .withValues(Toggle.values()).withInitialValue(glint)
                 .create(x0, y, 72, 20, Component.literal("Glint"), (b, v) -> glint = v));
         List<String> rarities = new ArrayList<>(List.of("default"));
         for (Rarity r : Rarity.values()) rarities.add(r.getSerializedName());
-        addRenderableWidget(CycleButton.<String>builder(s -> Component.literal(cap(s)))
+        addRenderableWidget(CycleButton.<String>builder(s -> Component.literal(s.equals("default") ? "Auto" : cap(s)))
                 .withValues(rarities).withInitialValue(rarity)
                 .create(x0 + 74, y, 72, 20, Component.literal("Rarity"), (b, v) -> rarity = v));
-        addRenderableWidget(CycleButton.<Toggle>builder(t -> Component.literal(t == Toggle.ON ? "Yes" : "Default"))
+        addRenderableWidget(CycleButton.<Toggle>builder(t -> Component.literal(t == Toggle.ON ? "Yes" : "Auto"))
                 .withValues(Toggle.DEFAULT, Toggle.ON).withInitialValue(unbreakable)
                 .create(x0 + 148, y, 72, 20, Component.literal("Unbreak."), (b, v) -> unbreakable = v));
-        y += 24;
+        y += 22;
 
         Button unobtainable = Button.builder(Component.literal("+ \"ITEM UNOBTAINABLE\"").withStyle(ChatFormatting.RED), b -> {
             for (EditBox box : lore) {
@@ -125,8 +125,8 @@ public class ItemDataScreen extends Screen {
         addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> {
             onDone.accept(build());
             minecraft.setScreen(parent);
-        }).bounds(width / 2 - 102, height - 28, 100, 20).build());
-        addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, b -> onClose()).bounds(width / 2 + 2, height - 28, 100, 20).build());
+        }).bounds(width / 2 - 102, height - 24, 100, 20).build());
+        addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, b -> onClose()).bounds(width / 2 + 2, height - 24, 100, 20).build());
     }
 
     private EditBox box(int x, int y, int w, String value, String hint) {
@@ -187,8 +187,8 @@ public class ItemDataScreen extends Screen {
         ItemStack preview = build();
         g.renderItem(preview, x0 + 2, 30);
         g.renderItemDecorations(font, preview, x0 + 2, 30);
-        g.drawString(font, "Lore", x0, 55, 0xA0A0A0);
-        int y = 54 + 10 + LORE_LINES * 18 + 6;
+        g.drawString(font, "Lore", x0, 53, 0xA0A0A0);
+        int y = 52 + 10 + LORE_LINES * 18 + 2;
         g.drawString(font, "Count", x0, y + 4, 0xA0A0A0);
         g.drawString(font, "Model data", x0 + 110, y + 4, 0xA0A0A0);
         if (mouseX >= x0 && mouseX < x0 + 20 && mouseY >= 28 && mouseY < 48) {

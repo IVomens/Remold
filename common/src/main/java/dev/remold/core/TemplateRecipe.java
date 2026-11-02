@@ -75,6 +75,10 @@ public final class TemplateRecipe {
                         : DataResult.error(() -> "Recipe is not a JSON object"));
     }
 
+    public static TemplateRecipe of(ResourceLocation id, JsonObject json) {
+        return new TemplateRecipe(id, json);
+    }
+
     // ------------------------------------------------------------------ scanning
 
     private static boolean isItem(JsonElement e) {

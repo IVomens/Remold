@@ -81,7 +81,15 @@ public final class RecipeFactory {
         }
         int i = Math.floorMod(index, machine.examples().size());
         state.exampleIndex = i;
-        DataResult<TemplateRecipe> result = TemplateRecipe.of(machine.examples().get(i), registries);
+        var pending = TemplateCache.get(machine.examples().get(i).id());
+        if (pending.isEmpty()) {
+            state.template = null;
+            state.templateError = "Loading template from the server...";
+            state.inputs = EditorState.empty(0);
+            state.outputs = new ItemStack[0];
+            return;
+        }
+        DataResult<TemplateRecipe> result = pending.get();
         if (result.error().isPresent()) {
             state.template = null;
             state.templateError = "Can't use " + machine.examples().get(i).id() + " as a template: " + result.error().get().message();

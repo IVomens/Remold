@@ -129,6 +129,21 @@ public final class ServerActions {
         return true;
     }
 
+    public static void handleTemplateRequest(ServerPlayer player, Payloads.RequestTemplate payload) {
+        if (!check(player)) return;
+        MinecraftServer server = player.server;
+        var holder = server.getRecipeManager().byKey(payload.id());
+        if (holder.isEmpty()) {
+            Services.PLATFORM.sendToPlayer(player, new Payloads.TemplateJson(payload.id(), "", "Unknown recipe " + payload.id()));
+            return;
+        }
+        RegistryOps<JsonElement> ops = server.registryAccess().createSerializationContext(JsonOps.INSTANCE);
+        var json = Recipe.CODEC.encodeStart(ops, holder.get().value());
+        Services.PLATFORM.sendToPlayer(player, json.error().isPresent()
+                ? new Payloads.TemplateJson(payload.id(), "", json.error().get().message())
+                : new Payloads.TemplateJson(payload.id(), json.getOrThrow().toString(), ""));
+    }
+
     public static void handleAnnotation(ServerPlayer player, Payloads.SetAnnotation payload) {
         if (!check(player)) return;
         try {

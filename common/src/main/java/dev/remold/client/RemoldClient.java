@@ -4,6 +4,7 @@ import dev.remold.Remold;
 import dev.remold.client.screen.EditorMenu;
 import dev.remold.client.screen.EditorScreen;
 import dev.remold.client.widget.IconButton;
+import dev.remold.core.TemplateCache;
 import dev.remold.data.Annotation;
 import dev.remold.data.TextUtil;
 import dev.remold.network.Payloads;
@@ -61,6 +62,14 @@ public final class RemoldClient {
 
     public static void handle(Payloads.SyncChanges payload) {
         ClientState.setChanges(payload.changes(), payload.pendingApply());
+        TemplateCache.clear();
+    }
+
+    public static void handle(Payloads.TemplateJson payload) {
+        TemplateCache.receive(payload);
+        if (Minecraft.getInstance().screen instanceof EditorScreen editor) {
+            editor.onTemplateReceived(payload.id());
+        }
     }
 
     public static void handle(Payloads.Notice payload) {
