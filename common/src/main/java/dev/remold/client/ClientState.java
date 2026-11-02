@@ -39,12 +39,18 @@ public final class ClientState {
     }
 
     private static boolean canUndo;
+    private static Map<ResourceLocation, dev.remold.data.TagEdit> tagEdits = Map.of();
+
+    public static Map<ResourceLocation, dev.remold.data.TagEdit> tagEdits() {
+        return tagEdits;
+    }
 
     public static boolean canUndo() {
         return canUndo;
     }
 
-    public static void setChanges(List<ChangeEntry> list, boolean pending, boolean undo) {
+    public static void setChanges(List<ChangeEntry> list, boolean pending, boolean undo, Map<ResourceLocation, dev.remold.data.TagEdit> tags) {
+        tagEdits = Map.copyOf(tags);
         changes = List.copyOf(list);
         pendingApply = pending;
         canUndo = undo;
@@ -66,6 +72,7 @@ public final class ClientState {
         changes = List.of();
         pendingApply = false;
         canUndo = false;
+        tagEdits = Map.of();
         dev.remold.core.TemplateCache.clear();
     }
 }

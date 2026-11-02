@@ -46,6 +46,10 @@ public class RemoldNeoForge {
                 (p, ctx) -> ServerActions.handleAction((ServerPlayer) ctx.player(), p));
         registrar.playToServer(Payloads.SetAnnotation.TYPE, Payloads.SetAnnotation.CODEC,
                 (p, ctx) -> ServerActions.handleAnnotation((ServerPlayer) ctx.player(), p));
+        registrar.playToServer(Payloads.SetTag.TYPE, Payloads.SetTag.CODEC,
+                (p, ctx) -> ServerActions.handleTag((ServerPlayer) ctx.player(), p));
+        registrar.playToServer(Payloads.Bulk.TYPE, Payloads.Bulk.CODEC,
+                (p, ctx) -> ServerActions.handleBulk((ServerPlayer) ctx.player(), p));
         registrar.playToServer(Payloads.RequestTemplate.TYPE, Payloads.RequestTemplate.CODEC,
                 (p, ctx) -> ServerActions.handleTemplateRequest((ServerPlayer) ctx.player(), p));
 

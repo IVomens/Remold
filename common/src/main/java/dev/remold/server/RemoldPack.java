@@ -11,6 +11,7 @@ import dev.remold.Remold;
 import dev.remold.data.Annotation;
 import dev.remold.data.ChangeEntry;
 import dev.remold.data.HistoryEntry;
+import dev.remold.data.TagEdit;
 import net.minecraft.SharedConstants;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
@@ -39,6 +40,8 @@ import java.util.concurrent.CompletableFuture;
  *   remold_manifest.json      what was changed, by whom and when
  *   remold_annotations.json   item tooltips / hidden items
  *   remold_history.json       previous versions, for undo
+ *   remold_tags.json          tag edits
+ *   data/&lt;namespace&gt;/tags/item/&lt;path&gt;.json
  *   data/&lt;namespace&gt;/recipe/&lt;path&gt;.json
  * </pre>
  * Because the result is a plain datapack, recipes keep working even if Remold is uninstalled, and
@@ -52,6 +55,8 @@ public final class RemoldPack {
     private static final Codec<List<ChangeEntry>> MANIFEST_CODEC = ChangeEntry.CODEC.listOf();
     private static final int MAX_HISTORY = 1000;
     private static final Codec<List<HistoryEntry>> HISTORY_CODEC = HistoryEntry.CODEC.listOf();
+    private static final Codec<Map<ResourceLocation, TagEdit>> TAGS_CODEC =
+            Codec.unboundedMap(ResourceLocation.CODEC, TagEdit.CODEC);
     private static final Codec<Map<ResourceLocation, Annotation>> ANNOTATIONS_CODEC =
             Codec.unboundedMap(ResourceLocation.CODEC, Annotation.CODEC);
 
@@ -60,6 +65,7 @@ public final class RemoldPack {
     private final Map<ResourceLocation, ChangeEntry> changes = new LinkedHashMap<>();
     private final Map<ResourceLocation, Annotation> annotations = new TreeMap<>();
     private final List<HistoryEntry> history = new ArrayList<>();
+    private final Map<ResourceLocation, TagEdit> tagEdits = new TreeMap<>();
     private long batch;
     private String batchAuthor = "";
     private boolean pendingApply;
@@ -105,6 +111,11 @@ public final class RemoldPack {
                 HISTORY_CODEC.parse(JsonOps.INSTANCE, json)
                         .resultOrPartial(e -> Remold.LOG.error("Bad remold_history.json: {}", e))
                         .ifPresent(history::addAll));
+
+        readJson(root.resolve("remold_tags.json")).ifPresent(json ->
+                TAGS_CODEC.parse(JsonOps.INSTANCE, json)
+                        .resultOrPartial(e -> Remold.LOG.error("Bad remold_tags.json: {}", e))
+                        .ifPresent(tagEdits::putAll));
 
         // Pack-wide defaults (shipped by modpacks) first, then the world's own annotations on top.
         Path global = dev.remold.platform.Services.PLATFORM.configDir().resolve(Remold.MOD_ID).resolve("annotations.json");
@@ -173,14 +184,24 @@ public final class RemoldPack {
         Optional<String> previous = Files.isRegularFile(file)
                 ? Optional.of(Files.readString(file, StandardCharsets.UTF_8)) : Optional.empty();
         history.add(new HistoryEntry(batch, false, id, previous, Optional.ofNullable(changes.get(id)),
-                Optional.empty(), batchAuthor, System.currentTimeMillis()));
+                Optional.empty(), batchAuthor, System.currentTimeMillis(), false, Optional.empty()));
         ensurePack();
         saveHistory();
     }
 
     private void rememberAnnotation(ResourceLocation item) throws IOException {
         history.add(new HistoryEntry(batch, true, item, Optional.empty(), Optional.empty(),
-                Optional.ofNullable(annotations.get(item)), batchAuthor, System.currentTimeMillis()));
+                Optional.ofNullable(annotations.get(item)), batchAuthor, System.currentTimeMillis(), false, Optional.empty()));
+        ensurePack();
+        saveHistory();
+    }
+
+    private void rememberTag(ResourceLocation tag) throws IOException {
+        Path file = tagFile(tag);
+        Optional<String> previous = Files.isRegularFile(file)
+                ? Optional.of(Files.readString(file, StandardCharsets.UTF_8)) : Optional.empty();
+        history.add(new HistoryEntry(batch, false, tag, previous, Optional.empty(), Optional.empty(),
+                batchAuthor, System.currentTimeMillis(), true, Optional.ofNullable(tagEdits.get(tag))));
         ensurePack();
         saveHistory();
     }
@@ -200,6 +221,19 @@ public final class RemoldPack {
             if (entry.annotation()) {
                 notes = true;
                 entry.previousAnnotation().ifPresentOrElse(a -> annotations.put(entry.id(), a), () -> annotations.remove(entry.id()));
+                continue;
+            }
+            if (entry.tag()) {
+                recipes = true; // tags need a reload too
+                Path file = tagFile(entry.id());
+                if (entry.previousFile().isPresent()) {
+                    Files.createDirectories(file.getParent());
+                    Files.writeString(file, entry.previousFile().get(), StandardCharsets.UTF_8);
+                } else {
+                    Files.deleteIfExists(file);
+                }
+                entry.previousTagEdit().ifPresentOrElse(e -> tagEdits.put(entry.id(), e), () -> tagEdits.remove(entry.id()));
+                saveTags();
                 continue;
             }
             recipes = true;
@@ -223,6 +257,43 @@ public final class RemoldPack {
 
     public boolean canUndo() {
         return !history.isEmpty();
+    }
+
+    public Path tagFile(ResourceLocation tag) {
+        return root.resolve("data").resolve(tag.getNamespace()).resolve("tags").resolve("item").resolve(tag.getPath() + ".json");
+    }
+
+    private void saveTags() throws IOException {
+        writeJson(root.resolve("remold_tags.json"), TAGS_CODEC.encodeStart(JsonOps.INSTANCE, tagEdits).getOrThrow());
+    }
+
+    public Map<ResourceLocation, TagEdit> tagEdits() {
+        return Map.copyOf(tagEdits);
+    }
+
+    /**
+     * Stores the complete set of edits for one item tag and writes its tag file.
+     *
+     * @param current the tag's current contents, for loaders that can't remove entries from tags
+     */
+    public void setTagEdit(ResourceLocation tag, TagEdit edit, List<String> current) throws IOException {
+        ensurePack();
+        rememberTag(tag);
+        if (edit.isEmpty()) {
+            tagEdits.remove(tag);
+            Files.deleteIfExists(tagFile(tag));
+        } else {
+            // "current" includes the effect of Remold's previous edit. Undo that part, so loaders that rewrite
+            // the whole tag (Fabric) restore entries that are no longer removed and drop ones no longer added.
+            TagEdit previous = tagEdits.getOrDefault(tag, TagEdit.EMPTY);
+            List<String> base = new ArrayList<>(current);
+            for (String r : previous.remove()) if (!edit.remove().contains(r) && !r.startsWith("#") && !base.contains(r)) base.add(r);
+            for (String a : previous.add()) if (!edit.add().contains(a)) base.remove(a);
+            tagEdits.put(tag, edit);
+            writeJson(tagFile(tag), dev.remold.platform.Services.PLATFORM.tagJson(edit.add(), edit.remove(), base));
+        }
+        saveTags();
+        pendingApply = true;
     }
 
     public Path recipeFile(ResourceLocation id) {

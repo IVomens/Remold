@@ -300,6 +300,37 @@ public final class TemplateRecipe {
         return DataResult.success(copy);
     }
 
+    /**
+     * A copy of this recipe with every reference to item {@code from} changed to {@code to}, or null if
+     * the recipe doesn't mention it. Tag ingredients are left alone (a tag isn't an item).
+     */
+    @org.jetbrains.annotations.Nullable
+    public JsonObject replaceItem(String from, String to, boolean inInputs, boolean inOutputs) {
+        JsonObject copy = json.deepCopy();
+        boolean changed = false;
+        List<Node> nodes = new ArrayList<>();
+        if (inInputs) nodes.addAll(inputs);
+        if (inOutputs) nodes.addAll(outputs);
+        for (Node node : nodes) {
+            if (node.style() == NodeStyle.INGREDIENT_TAG) continue;
+            JsonElement e = get(copy, node.path());
+            if (node.style() == NodeStyle.PLAIN_STRING) {
+                if (e.getAsString().equals(from)) {
+                    set(copy, node.path(), new JsonPrimitive(to));
+                    changed = true;
+                }
+                continue;
+            }
+            String key = node.style() == NodeStyle.STACK_ID ? "id" : "item";
+            JsonObject obj = e.getAsJsonObject();
+            if (obj.has(key) && obj.get(key).getAsString().equals(from)) {
+                obj.addProperty(key, to);
+                changed = true;
+            }
+        }
+        return changed ? copy : null;
+    }
+
     // ------------------------------------------------------------------ json paths
 
     static JsonElement get(JsonElement root, List<Object> path) {

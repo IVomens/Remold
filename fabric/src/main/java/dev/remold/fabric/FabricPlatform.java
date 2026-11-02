@@ -50,6 +50,25 @@ public class FabricPlatform implements RemoldPlatform {
     }
 
     @Override
+    public JsonObject tagJson(java.util.List<String> add, java.util.List<String> remove, java.util.List<String> current) {
+        JsonObject json = new JsonObject();
+        JsonArray values = new JsonArray();
+        if (remove.isEmpty()) {
+            add.forEach(values::add);
+        } else {
+            // Vanilla/Fabric tags can't remove entries, so replace the tag with its current contents
+            // minus the removed items. Removed #tags are expanded already, so only items are filtered.
+            json.addProperty("replace", true);
+            java.util.LinkedHashSet<String> entries = new java.util.LinkedHashSet<>(current);
+            entries.addAll(add);
+            entries.removeAll(remove);
+            entries.forEach(values::add);
+        }
+        json.add("values", values);
+        return json;
+    }
+
+    @Override
     public JsonObject disabledRecipeJson() {
         // {"fabric:load_conditions": [{"condition": "fabric:not", "value": {"condition": "fabric:true"}}]}
         JsonObject alwaysTrue = new JsonObject();

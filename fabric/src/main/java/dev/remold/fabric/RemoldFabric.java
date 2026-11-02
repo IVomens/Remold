@@ -33,6 +33,8 @@ public class RemoldFabric implements ModInitializer {
         toServer(Payloads.SaveRecipe.TYPE, Payloads.SaveRecipe.CODEC, ServerActions::handleSave);
         toServer(Payloads.RecipeAction.TYPE, Payloads.RecipeAction.CODEC, ServerActions::handleAction);
         toServer(Payloads.SetAnnotation.TYPE, Payloads.SetAnnotation.CODEC, ServerActions::handleAnnotation);
+        toServer(Payloads.SetTag.TYPE, Payloads.SetTag.CODEC, ServerActions::handleTag);
+        toServer(Payloads.Bulk.TYPE, Payloads.Bulk.CODEC, ServerActions::handleBulk);
         toServer(Payloads.RequestTemplate.TYPE, Payloads.RequestTemplate.CODEC, ServerActions::handleTemplateRequest);
 
         // Client-bound types are registered on both sides; their handlers are set in RemoldFabricClient.

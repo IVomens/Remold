@@ -45,6 +45,21 @@ public class NeoForgePlatform implements RemoldPlatform {
     }
 
     @Override
+    public JsonObject tagJson(java.util.List<String> add, java.util.List<String> remove, java.util.List<String> current) {
+        // NeoForge supports removing entries from a tag: {"values": [...], "remove": [...]}
+        JsonObject json = new JsonObject();
+        JsonArray values = new JsonArray();
+        add.forEach(values::add);
+        json.add("values", values);
+        if (!remove.isEmpty()) {
+            JsonArray removed = new JsonArray();
+            remove.forEach(removed::add);
+            json.add("remove", removed);
+        }
+        return json;
+    }
+
+    @Override
     public JsonObject disabledRecipeJson() {
         // {"neoforge:conditions": [{"type": "neoforge:false"}]}
         JsonObject condition = new JsonObject();

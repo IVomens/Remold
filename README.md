@@ -23,13 +23,16 @@ press **Save**. That's it.
 | **Item tooltips everywhere** | Add lines like a red **ITEM UNOBTAINABLE** to an item for every player, and optionally hide it from JEI/EMI. |
 | **Make unobtainable** | One click removes every recipe (from every mod and machine) that makes an item, and tags it. |
 | **JEI / EMI / REI** | Drag items from the item list onto the editor slots. Machine icons come from the viewer's catalysts/workstations. With JEI, the **+** button on any recipe loads it into the editor, and **R** / **U** work on editor slots (also with EMI). |
+| **Item tag editor** | Add items to or remove items from any item tag (or create new ones), e.g. put a modded copper ingot in `#c:ingots/copper` so it works in every mod's recipes. Found under **Recipes... → Tags...** |
+| **Bulk changes** | **Recipes... → Bulk...**: replace an item with another in every recipe, remove every recipe that uses an item, or remove every recipe from a mod. Shows what will change first, and the whole action is one Undo step. |
+| **Usage view** | Search recipes by what they *make* or what they *use*, or click **Uses** on any recipe. The tooltip screen shows how many recipes use an item before you make it unobtainable. |
 | **Conflict warnings** | Saving a recipe that uses the same items as an existing one (which Minecraft would silently ignore) asks you to replace the other recipe, save anyway, or cancel. |
 | **Undo** | Every change is recorded. **Undo** in the recipe browser (or `/remold undo`) steps back one action at a time, including bulk ones like "make unobtainable". |
 | **Permissions** | `config/remold/remold.json` sets the permission level needed, and can allow specific players who aren't operators. |
 | **Translatable** | All text is in `assets/remold/lang/`. Add a file such as `de_de.json` to translate Remold. |
 | **Batch changes** | Shift-click Save/Remove to queue changes, then **Apply** once. Reloading a big pack takes time, so this keeps it to one reload. |
 | **Plain datapack output** | Everything goes to `world/datapacks/remold/` as standard recipe JSON. Uninstall Remold and your recipes still work. |
-| **Export** | `/remold export` writes a zipped datapack plus an equivalent **KubeJS** script, for modpacks and other servers. |
+| **Export** | `/remold export` writes a zipped datapack plus an equivalent **KubeJS** script (recipes and tags), for modpacks and other servers. |
 
 ## Using it
 
@@ -82,6 +85,8 @@ fabric/     ~200 lines: the same for Fabric API, plus one mixin accessor for the
   become slots) and for numbers, strings and booleans (those become editable values). Then it writes
   an edited copy back through the same codec. The target mod validates the result itself, so
   any data-driven machine works.
+* **Tags** are written to `data/<namespace>/tags/item/` in the same pack. On NeoForge, removals use
+  NeoForge's `remove` list. Fabric has no tag removal, so a tag with removals is rewritten in full.
 * **Removing** writes a recipe file that the loader skips (`neoforge:conditions: [neoforge:false]`)
   over the original id, in a datapack with the highest priority.
 

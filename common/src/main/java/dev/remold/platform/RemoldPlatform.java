@@ -29,4 +29,13 @@ public interface RemoldPlatform {
      * existing recipe id in a higher priority datapack removes that recipe.
      */
     JsonObject disabledRecipeJson();
+
+    /**
+     * The tag file that applies Remold's edits to a tag.
+     *
+     * @param add     entries to add (item ids, or {@code #tag} ids)
+     * @param remove  entries to remove
+     * @param current the tag's current contents (item ids), for loaders without tag removal support
+     */
+    JsonObject tagJson(java.util.List<String> add, java.util.List<String> remove, java.util.List<String> current);
 }
