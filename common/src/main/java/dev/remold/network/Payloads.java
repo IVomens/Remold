@@ -157,6 +157,91 @@ public final class Payloads {
         }
     }
 
+    public record SourceRequest(String key, int index) implements CustomPacketPayload {
+        public static final Type<SourceRequest> TYPE = Payloads.typeOf("source_request");
+        public static final StreamCodec<ByteBuf, SourceRequest> CODEC = StreamCodec.composite(
+                ByteBufCodecs.STRING_UTF8, SourceRequest::key,
+                ByteBufCodecs.VAR_INT, SourceRequest::index,
+                SourceRequest::new);
+
+        @Override
+        public Type<SourceRequest> type() {
+            return TYPE;
+        }
+    }
+
+    public record SourceSave(String key, int index, String json, boolean apply) implements CustomPacketPayload {
+        public static final Type<SourceSave> TYPE = Payloads.typeOf("source_save");
+        public static final StreamCodec<ByteBuf, SourceSave> CODEC = StreamCodec.composite(
+                ByteBufCodecs.STRING_UTF8, SourceSave::key,
+                ByteBufCodecs.VAR_INT, SourceSave::index,
+                ByteBufCodecs.stringUtf8(1 << 20), SourceSave::json,
+                ByteBufCodecs.BOOL, SourceSave::apply,
+                SourceSave::new);
+
+        @Override
+        public Type<SourceSave> type() {
+            return TYPE;
+        }
+    }
+
+    public record SourceInfo(String key, String kind, String name, int recipes) {
+        public static final StreamCodec<ByteBuf, SourceInfo> CODEC = StreamCodec.composite(
+                ByteBufCodecs.STRING_UTF8, SourceInfo::key,
+                ByteBufCodecs.STRING_UTF8, SourceInfo::kind,
+                ByteBufCodecs.STRING_UTF8, SourceInfo::name,
+                ByteBufCodecs.VAR_INT, SourceInfo::recipes,
+                SourceInfo::new);
+    }
+
+    public record SourceList(List<SourceInfo> files) implements CustomPacketPayload {
+        public static final Type<SourceList> TYPE = Payloads.typeOf("source_list");
+        public static final StreamCodec<ByteBuf, SourceList> CODEC = SourceInfo.CODEC.apply(ByteBufCodecs.list())
+                .map(SourceList::new, SourceList::files);
+
+        @Override
+        public Type<SourceList> type() {
+            return TYPE;
+        }
+    }
+
+    public record SourceEntry(int index, String id, String output, String problem) {
+        public static final StreamCodec<ByteBuf, SourceEntry> CODEC = StreamCodec.composite(
+                ByteBufCodecs.VAR_INT, SourceEntry::index,
+                ByteBufCodecs.STRING_UTF8, SourceEntry::id,
+                ByteBufCodecs.STRING_UTF8, SourceEntry::output,
+                ByteBufCodecs.STRING_UTF8, SourceEntry::problem,
+                SourceEntry::new);
+    }
+
+    public record SourceEntries(String key, List<SourceEntry> entries) implements CustomPacketPayload {
+        public static final Type<SourceEntries> TYPE = Payloads.typeOf("source_entries");
+        public static final StreamCodec<ByteBuf, SourceEntries> CODEC = StreamCodec.composite(
+                ByteBufCodecs.STRING_UTF8, SourceEntries::key,
+                SourceEntry.CODEC.apply(ByteBufCodecs.list()), SourceEntries::entries,
+                SourceEntries::new);
+
+        @Override
+        public Type<SourceEntries> type() {
+            return TYPE;
+        }
+    }
+
+    public record SourceRecipe(String key, int index, String id, String json) implements CustomPacketPayload {
+        public static final Type<SourceRecipe> TYPE = Payloads.typeOf("source_recipe");
+        public static final StreamCodec<ByteBuf, SourceRecipe> CODEC = StreamCodec.composite(
+                ByteBufCodecs.STRING_UTF8, SourceRecipe::key,
+                ByteBufCodecs.VAR_INT, SourceRecipe::index,
+                ByteBufCodecs.STRING_UTF8, SourceRecipe::id,
+                ByteBufCodecs.stringUtf8(1 << 20), SourceRecipe::json,
+                SourceRecipe::new);
+
+        @Override
+        public Type<SourceRecipe> type() {
+            return TYPE;
+        }
+    }
+
     public record RequestTemplate(ResourceLocation id) implements CustomPacketPayload {
         public static final Type<RequestTemplate> TYPE = Payloads.typeOf("request_template");
         public static final StreamCodec<ByteBuf, RequestTemplate> CODEC = ResourceLocation.STREAM_CODEC.map(RequestTemplate::new, RequestTemplate::id);

@@ -29,7 +29,17 @@ import java.util.Set;
 public final class TemplateRecipe {
     public enum NodeStyle { INGREDIENT_ITEM, INGREDIENT_TAG, STACK_ID, STACK_ITEM, PLAIN_STRING }
 
-    public record Node(List<Object> path, NodeStyle style, boolean output) {}
+    public record Node(List<Object> path, NodeStyle style, boolean output, @org.jetbrains.annotations.Nullable List<Object> countPath) {
+        public Node(List<Object> path, NodeStyle style, boolean output) {
+            this(path, style, output, null);
+        }
+
+        public boolean countable() {
+            return countPath != null;
+        }
+    }
+
+    private static final List<String> COUNT_KEYS = List.of("count", "amount");
 
     public record Param(List<Object> path, JsonPrimitive original) {
         public String label() {
@@ -57,6 +67,7 @@ public final class TemplateRecipe {
         this.sourceId = sourceId;
         this.json = json;
         walk(json, new ArrayList<>(), false);
+        findCounts();
     }
 
     public static DataResult<TemplateRecipe> of(RecipeHolder<?> holder, HolderLookup.Provider registries) {
@@ -157,14 +168,53 @@ public final class TemplateRecipe {
         return copy;
     }
 
+    private void findCounts() {
+        List<List<Object>> countPaths = new ArrayList<>();
+        for (int i = 0; i < inputs.size(); i++) {
+            Node node = inputs.get(i);
+            if (node.style() == NodeStyle.PLAIN_STRING || node.style() == NodeStyle.STACK_ID) continue;
+            List<Object> found = countPathFor(node.path());
+            if (found != null) {
+                inputs.set(i, new Node(node.path(), node.style(), false, found));
+                countPaths.add(found);
+            }
+        }
+        params.removeIf(p -> countPaths.contains(p.path()));
+    }
+
+    @org.jetbrains.annotations.Nullable
+    private List<Object> countPathFor(List<Object> path) {
+        JsonElement own = get(json, path);
+        if (own.isJsonObject()) {
+            for (String key : COUNT_KEYS) {
+                if (isNumber(own.getAsJsonObject().get(key))) return append(path, key);
+            }
+        }
+        if (path.size() >= 2 && path.getLast() instanceof String) {
+            List<Object> parentPath = path.subList(0, path.size() - 1);
+            JsonElement parent = get(json, parentPath);
+            if (parent.isJsonObject() && parent.getAsJsonObject().size() <= 3) {
+                for (String key : COUNT_KEYS) {
+                    if (isNumber(parent.getAsJsonObject().get(key))) return append(new ArrayList<>(parentPath), key);
+                }
+            }
+        }
+        return null;
+    }
+
+    private static boolean isNumber(@org.jetbrains.annotations.Nullable JsonElement e) {
+        return e != null && e.isJsonPrimitive() && e.getAsJsonPrimitive().isNumber();
+    }
+
     public GhostIngredient initialInput(Node node) {
         JsonElement e = get(json, node.path());
+        int count = node.countable() ? Math.max(1, get(json, node.countPath()).getAsInt()) : 1;
         if (node.style() == NodeStyle.INGREDIENT_TAG) {
             TagKey<Item> tag = TagKey.create(Registries.ITEM, ResourceLocation.parse(e.getAsJsonObject().get("tag").getAsString()));
             ItemStack first = GhostIngredient.tagItems(tag).stream().findFirst().map(ItemStack::new).orElse(new ItemStack(Items.BARRIER));
-            return new GhostIngredient(first, tag);
+            return new GhostIngredient(first.copyWithCount(count), tag);
         }
-        return GhostIngredient.of(stackOf(e, node.style()));
+        return new GhostIngredient(stackOf(e, node.style()).copyWithCount(count), null);
     }
 
     public ItemStack initialOutput(Node node, HolderLookup.Provider registries) {
@@ -236,6 +286,7 @@ public final class TemplateRecipe {
             obj.remove("tag");
             if (ghost.tag() != null) obj.addProperty("tag", ghost.tag().location().toString());
             else obj.addProperty("item", itemId);
+            if (node.countable()) set(copy, node.countPath(), new JsonPrimitive(Math.max(1, ghost.stack().getCount())));
         }
 
         for (int i = 0; i < this.outputs.size(); i++) {

@@ -268,6 +268,16 @@ public final class ServerActions {
         }
     }
 
+    public static void handleSourceRequest(ServerPlayer player, Payloads.SourceRequest payload) {
+        if (!check(player)) return;
+        SourceFiles.handleRequest(player, payload);
+    }
+
+    public static void handleSourceSave(ServerPlayer player, Payloads.SourceSave payload) {
+        if (!check(player)) return;
+        SourceFiles.handleSave(player, payload);
+    }
+
     public static void handleGates(ServerPlayer player, Payloads.SetGates payload) {
         if (!check(player)) return;
         Gates.handleSet(player, payload);

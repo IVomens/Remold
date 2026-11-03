@@ -64,15 +64,6 @@ public class RecipeBrowserScreen extends Screen {
     @Override
     protected void init() {
         int x0 = width / 2 - 182;
-        addRenderableWidget(Button.builder(RemoldText.tr("browser.tags"), b -> minecraft.setScreen(new TagEditorScreen(this)))
-                .bounds(x0, 4, 60, 16).build()).setTooltip(Tooltip.create(RemoldText.tr("browser.tags.hint")));
-        addRenderableWidget(Button.builder(RemoldText.tr("browser.import"), b -> minecraft.setScreen(new ImportScreen(this)))
-                .bounds(x0 + 64, 4, 60, 16).build()).setTooltip(Tooltip.create(RemoldText.tr("browser.import.hint")));
-        addRenderableWidget(Button.builder(RemoldText.tr("browser.unify"), b -> minecraft.setScreen(new UnifyScreen(this)))
-                .bounds(x0 + 240, 4, 60, 16).build()).setTooltip(Tooltip.create(RemoldText.tr("browser.unify.hint")));
-        addRenderableWidget(Button.builder(RemoldText.tr("browser.bulk"), b -> minecraft.setScreen(new BulkScreen(this)))
-                .bounds(x0 + 304, 4, 60, 16).build()).setTooltip(Tooltip.create(RemoldText.tr("browser.bulk.hint")));
-
         search = new EditBox(font, x0, 24, 176, 16, RemoldText.tr("search"));
         search.setHint(RemoldText.tr("browser.search").withStyle(ChatFormatting.DARK_GRAY));
         search.setValue(query);
@@ -247,9 +238,16 @@ public class RecipeBrowserScreen extends Screen {
         }
     }
 
+    @org.jetbrains.annotations.Nullable private Screen back;
+
+    public RecipeBrowserScreen backTo(Screen screen) {
+        back = screen;
+        return this;
+    }
+
     @Override
     public void onClose() {
-        minecraft.setScreen(editor);
+        minecraft.setScreen(back != null ? back : editor);
     }
 
     class RowList extends ObjectSelectionList<RowList.Entry> {

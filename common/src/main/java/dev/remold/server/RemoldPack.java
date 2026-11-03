@@ -267,6 +267,21 @@ public final class RemoldPack {
         return changed;
     }
 
+    private static final String EXTERNAL = "external:";
+
+    public void writeExternal(Path file, String content) throws IOException {
+        ensurePack();
+        Optional<String> previous = Files.isRegularFile(file)
+                ? Optional.of(Files.readString(file, StandardCharsets.UTF_8)) : Optional.empty();
+        String relative = server.getServerDirectory().toAbsolutePath().normalize().relativize(file.toAbsolutePath().normalize()).toString().replace('\\', '/');
+        history.add(new HistoryEntry(batch, false, Remold.id("external"), previous, Optional.empty(), Optional.empty(),
+                batchAuthor, System.currentTimeMillis(), false, Optional.empty(), Optional.of(EXTERNAL + relative)));
+        saveHistory();
+        Files.createDirectories(file.getParent());
+        Files.writeString(file, content, StandardCharsets.UTF_8);
+        pendingApply = true;
+    }
+
     private void rememberConfig(String fileName) throws IOException {
         ensurePack();
         Path file = root.resolve(fileName);
@@ -288,6 +303,17 @@ public final class RemoldPack {
         while (!history.isEmpty() && history.getLast().batch() == last) {
             HistoryEntry entry = history.removeLast();
             count++;
+            if (entry.configFile().isPresent() && entry.configFile().get().startsWith(EXTERNAL)) {
+                Path file = server.getServerDirectory().resolve(entry.configFile().get().substring(EXTERNAL.length()));
+                if (entry.previousFile().isPresent()) {
+                    Files.createDirectories(file.getParent());
+                    Files.writeString(file, entry.previousFile().get(), StandardCharsets.UTF_8);
+                } else {
+                    Files.deleteIfExists(file);
+                }
+                recipes = true;
+                continue;
+            }
             if (entry.configFile().isPresent()) {
                 Path file = root.resolve(entry.configFile().get());
                 if (entry.previousFile().isPresent()) Files.writeString(file, entry.previousFile().get(), StandardCharsets.UTF_8);

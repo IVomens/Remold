@@ -31,6 +31,7 @@ public final class EditorState {
         for (GhostIngredient g : inputs) {
             sb.append('|').append(g.isEmpty() ? "-" : net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(g.stack().getItem()));
             if (g.tag() != null) sb.append('#').append(g.tag().location());
+            if (!g.isEmpty()) sb.append('x').append(g.stack().getCount());
         }
         for (ItemStack s : outputs) {
             sb.append("|>").append(s.isEmpty() ? "-" : net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(s.getItem()) + "x" + s.getCount() + "@" + s.getComponentsPatch().hashCode());
@@ -38,6 +39,21 @@ public final class EditorState {
         sb.append('|').append(recipeId).append('|').append(cookTime).append('|').append(experience).append('|').append(exampleIndex);
         for (String p : params) sb.append('|').append(p);
         return sb.toString();
+    }
+
+    @Nullable public String sourceKey;
+    public int sourceIndex = -1;
+    @Nullable public String sourceName;
+    @Nullable public String checklistMod;
+
+    public boolean fromSource() {
+        return sourceKey != null;
+    }
+
+    public void forgetSource() {
+        sourceKey = null;
+        sourceIndex = -1;
+        sourceName = null;
     }
 
     public void markClean() {
@@ -61,6 +77,7 @@ public final class EditorState {
     }
 
     public void clear() {
+        forgetSource();
         inputs = empty(inputs.length);
         outputs = new ItemStack[outputs.length];
         Arrays.fill(outputs, ItemStack.EMPTY);

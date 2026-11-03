@@ -47,6 +47,10 @@ public class RemoldNeoForge {
                 (p, ctx) -> ServerActions.handleTag((ServerPlayer) ctx.player(), p));
         registrar.playToServer(Payloads.Bulk.TYPE, Payloads.Bulk.CODEC,
                 (p, ctx) -> ServerActions.handleBulk((ServerPlayer) ctx.player(), p));
+        registrar.playToServer(Payloads.SourceRequest.TYPE, Payloads.SourceRequest.CODEC,
+                (p, ctx) -> ServerActions.handleSourceRequest((ServerPlayer) ctx.player(), p));
+        registrar.playToServer(Payloads.SourceSave.TYPE, Payloads.SourceSave.CODEC,
+                (p, ctx) -> ServerActions.handleSourceSave((ServerPlayer) ctx.player(), p));
         registrar.playToServer(Payloads.SetGates.TYPE, Payloads.SetGates.CODEC,
                 (p, ctx) -> ServerActions.handleGates((ServerPlayer) ctx.player(), p));
         registrar.playToServer(Payloads.Unify.TYPE, Payloads.Unify.CODEC,
@@ -60,6 +64,9 @@ public class RemoldNeoForge {
         registrar.playToClient(Payloads.SyncAnnotations.TYPE, Payloads.SyncAnnotations.CODEC, (p, ctx) -> RemoldClient.handle(p));
         registrar.playToClient(Payloads.SyncChanges.TYPE, Payloads.SyncChanges.CODEC, (p, ctx) -> RemoldClient.handle(p));
         registrar.playToClient(Payloads.TemplateJson.TYPE, Payloads.TemplateJson.CODEC, (p, ctx) -> RemoldClient.handle(p));
+        registrar.playToClient(Payloads.SourceList.TYPE, Payloads.SourceList.CODEC, (p, ctx) -> RemoldClient.handle(p));
+        registrar.playToClient(Payloads.SourceEntries.TYPE, Payloads.SourceEntries.CODEC, (p, ctx) -> RemoldClient.handle(p));
+        registrar.playToClient(Payloads.SourceRecipe.TYPE, Payloads.SourceRecipe.CODEC, (p, ctx) -> RemoldClient.handle(p));
         registrar.playToClient(Payloads.SyncGates.TYPE, Payloads.SyncGates.CODEC, (p, ctx) -> RemoldClient.handle(p));
         registrar.playToClient(Payloads.ImportList.TYPE, Payloads.ImportList.CODEC, (p, ctx) -> RemoldClient.handle(p));
         registrar.playToClient(Payloads.Access.TYPE, Payloads.Access.CODEC, (p, ctx) -> RemoldClient.handle(p));

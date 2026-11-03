@@ -43,6 +43,10 @@ public final class TemplateCache {
         }
     }
 
+    public static void preload(ResourceLocation id, com.google.gson.JsonObject json) {
+        CACHE.put(id, DataResult.success(TemplateRecipe.of(id, json)));
+    }
+
     public static void clear() {
         CACHE.clear();
         REQUESTED.clear();

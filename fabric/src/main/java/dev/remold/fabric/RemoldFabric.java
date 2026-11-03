@@ -34,6 +34,8 @@ public class RemoldFabric implements ModInitializer {
         toServer(Payloads.SetAnnotation.TYPE, Payloads.SetAnnotation.CODEC, ServerActions::handleAnnotation);
         toServer(Payloads.SetTag.TYPE, Payloads.SetTag.CODEC, ServerActions::handleTag);
         toServer(Payloads.Bulk.TYPE, Payloads.Bulk.CODEC, ServerActions::handleBulk);
+        toServer(Payloads.SourceRequest.TYPE, Payloads.SourceRequest.CODEC, ServerActions::handleSourceRequest);
+        toServer(Payloads.SourceSave.TYPE, Payloads.SourceSave.CODEC, ServerActions::handleSourceSave);
         toServer(Payloads.SetGates.TYPE, Payloads.SetGates.CODEC, ServerActions::handleGates);
         toServer(Payloads.Unify.TYPE, Payloads.Unify.CODEC, ServerActions::handleUnify);
         toServer(Payloads.ImportRequest.TYPE, Payloads.ImportRequest.CODEC, ServerActions::handleImport);
@@ -43,6 +45,9 @@ public class RemoldFabric implements ModInitializer {
         PayloadTypeRegistry.playS2C().register(Payloads.SyncAnnotations.TYPE, Payloads.SyncAnnotations.CODEC);
         PayloadTypeRegistry.playS2C().register(Payloads.SyncChanges.TYPE, Payloads.SyncChanges.CODEC);
         PayloadTypeRegistry.playS2C().register(Payloads.TemplateJson.TYPE, Payloads.TemplateJson.CODEC);
+        PayloadTypeRegistry.playS2C().register(Payloads.SourceList.TYPE, Payloads.SourceList.CODEC);
+        PayloadTypeRegistry.playS2C().register(Payloads.SourceEntries.TYPE, Payloads.SourceEntries.CODEC);
+        PayloadTypeRegistry.playS2C().register(Payloads.SourceRecipe.TYPE, Payloads.SourceRecipe.CODEC);
         PayloadTypeRegistry.playS2C().register(Payloads.SyncGates.TYPE, Payloads.SyncGates.CODEC);
         PayloadTypeRegistry.playS2C().register(Payloads.ImportList.TYPE, Payloads.ImportList.CODEC);
         PayloadTypeRegistry.playS2C().register(Payloads.Access.TYPE, Payloads.Access.CODEC);

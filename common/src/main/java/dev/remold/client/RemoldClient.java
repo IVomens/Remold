@@ -47,8 +47,12 @@ public final class RemoldClient {
             return;
         }
         Services.PLATFORM.sendToServer(Payloads.RecipeAction.simple(Payloads.Action.SYNC));
-        EditorScreen screen = new EditorScreen(new EditorMenu(mc.player.getInventory(), EditorScreen.INV_X, EditorScreen.INV_Y), mc.player.getInventory(), parent);
-        mc.setScreen(screen);
+        mc.setScreen(new dev.remold.client.screen.HomeScreen(parent));
+    }
+
+    public static EditorScreen newEditor(@Nullable Screen parent) {
+        Minecraft mc = Minecraft.getInstance();
+        return new EditorScreen(new EditorMenu(mc.player.getInventory(), EditorScreen.INV_X, EditorScreen.INV_Y), mc.player.getInventory(), parent);
     }
 
     public static void handle(Payloads.OpenEditor payload) {
@@ -69,6 +73,18 @@ public final class RemoldClient {
         if (Minecraft.getInstance().screen instanceof EditorScreen editor) {
             editor.onTemplateReceived(payload.id());
         }
+    }
+
+    public static void handle(Payloads.SourceList payload) {
+        if (Minecraft.getInstance().screen instanceof dev.remold.client.screen.FilesScreen screen) screen.receive(payload);
+    }
+
+    public static void handle(Payloads.SourceEntries payload) {
+        if (Minecraft.getInstance().screen instanceof dev.remold.client.screen.FilesScreen screen) screen.receive(payload);
+    }
+
+    public static void handle(Payloads.SourceRecipe payload) {
+        if (Minecraft.getInstance().screen instanceof dev.remold.client.screen.FilesScreen screen) screen.receive(payload);
     }
 
     public static void handle(Payloads.SyncGates payload) {
