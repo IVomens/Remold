@@ -16,8 +16,7 @@ final class RemovalCheck {
 
     static List<Component> lost(Minecraft mc, Set<ResourceLocation> removed, Set<Item> intended) {
         var all = mc.level.getRecipeManager().getRecipes();
-        List<Recipe<?>> before = all.stream().<Recipe<?>>map(RecipeHolder::value).toList();
-        List<Item> lost = ProgressionCheck.lostItems(before, ProgressionCheck.without(all, removed), intended, mc.level.registryAccess());
+        List<Item> lost = ProgressionCheck.lostItemsFrom(all, ProgressionCheck.without(all, removed), intended, mc.level.registryAccess());
         return ProgressionCheck.describeLost(lost, 12);
     }
 }

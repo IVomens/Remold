@@ -89,15 +89,27 @@ public final class ProgressionCheck {
         return obtained;
     }
 
-    public static List<Item> lostItems(Collection<? extends Recipe<?>> before, Collection<? extends Recipe<?>> after,
-                                       Set<Item> ignore, HolderLookup.Provider registries) {
-        Set<Item> natural = new HashSet<>();
-        Set<Item> made = produced(before, registries);
-        for (Item item : BuiltInRegistries.ITEM) if (!made.contains(item)) natural.add(item);
-        Set<Item> was = craftable(before, natural, registries);
-        Set<Item> now = craftable(after, natural, registries);
+    private static Object cachedFor;
+    private static int cachedSize = -1;
+    private static Set<Item> cachedNatural;
+    private static Set<Item> cachedWas;
+
+    public static List<Item> lostItemsFrom(Collection<RecipeHolder<?>> all, Collection<? extends Recipe<?>> after,
+                                           Set<Item> ignore, HolderLookup.Provider registries) {
+        if (cachedFor != all || cachedSize != all.size()) {
+            List<Recipe<?>> before = new ArrayList<>(all.size());
+            for (RecipeHolder<?> h : all) before.add(h.value());
+            Set<Item> natural = new HashSet<>();
+            Set<Item> made = produced(before, registries);
+            for (Item item : BuiltInRegistries.ITEM) if (!made.contains(item)) natural.add(item);
+            cachedNatural = natural;
+            cachedWas = craftable(before, natural, registries);
+            cachedFor = all;
+            cachedSize = all.size();
+        }
+        Set<Item> now = craftable(after, cachedNatural, registries);
         List<Item> lost = new ArrayList<>();
-        for (Item item : was) if (!now.contains(item) && !ignore.contains(item)) lost.add(item);
+        for (Item item : cachedWas) if (!now.contains(item) && !ignore.contains(item)) lost.add(item);
         lost.sort(Comparator.comparing(i -> BuiltInRegistries.ITEM.getKey(i).toString()));
         return lost;
     }

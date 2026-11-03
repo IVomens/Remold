@@ -564,8 +564,7 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
         if (recipes().byKey(recipeId).isPresent()) {
             List<net.minecraft.world.item.crafting.Recipe<?>> after = ProgressionCheck.without(all, java.util.Set.of(recipeId));
             after.add(parsed.get());
-            warnings.addAll(ProgressionCheck.describeLost(ProgressionCheck.lostItems(
-                    all.stream().<net.minecraft.world.item.crafting.Recipe<?>>map(RecipeHolder::value).toList(), after, java.util.Set.of(), registries()), 12));
+            warnings.addAll(ProgressionCheck.describeLost(ProgressionCheck.lostItemsFrom(all, after, java.util.Set.of(), registries()), 12));
         }
         return warnings;
     }

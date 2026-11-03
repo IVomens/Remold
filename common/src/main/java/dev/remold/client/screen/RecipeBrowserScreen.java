@@ -43,7 +43,14 @@ public class RecipeBrowserScreen extends Screen {
     private Button edit, remove, revert, undo, uses, lock;
     @Nullable private Row selected;
 
-    record Row(ResourceLocation id, @Nullable RecipeHolder<?> holder, ItemStack icon, String type, @Nullable ChangeEntry change) {}
+    record Row(ResourceLocation id, @Nullable RecipeHolder<?> holder, ItemStack icon, String type, @Nullable ChangeEntry change, String search) {
+        Row(ResourceLocation id, @Nullable RecipeHolder<?> holder, ItemStack icon, String type, @Nullable ChangeEntry change) {
+            this(id, holder, icon, type, change, (id + " " + type + " " + icon.getHoverName().getString() + " "
+                    + BuiltInRegistries.ITEM.getKey(icon.getItem())).toLowerCase(Locale.ROOT));
+        }
+    }
+
+    @Nullable private List<Row> cachedRows;
 
     public RecipeBrowserScreen(EditorScreen editor, String query) {
         super(RemoldText.tr("browser.title"));
@@ -109,6 +116,7 @@ public class RecipeBrowserScreen extends Screen {
                 .bounds(x + step * 6, y, w, 20).build());
         apply.setTooltip(Tooltip.create(RemoldText.tr("browser.apply.hint")));
         addRenderableWidget(Button.builder(CommonComponents.GUI_BACK, b -> onClose()).bounds(x + step * 7, y, w, 20).build());
+        lastHash = currentHash();
         refresh();
         setInitialFocus(search);
     }
@@ -136,6 +144,11 @@ public class RecipeBrowserScreen extends Screen {
     }
 
     private List<Row> allRows() {
+        if (cachedRows == null) cachedRows = buildRows();
+        return cachedRows;
+    }
+
+    private List<Row> buildRows() {
         var level = minecraft.level;
         Map<ResourceLocation, ChangeEntry> changes = new HashMap<>();
         for (ChangeEntry c : ClientState.changes()) changes.put(c.id(), c);
@@ -161,20 +174,17 @@ public class RecipeBrowserScreen extends Screen {
     private void refresh() {
         String q = query.toLowerCase(Locale.ROOT).trim();
         Set<Item> items = mode != Mode.ALL && !q.isEmpty() ? matchingItems(q) : Set.of();
-        var registries = minecraft.level.registryAccess();
-        List<Row> rows = allRows().stream().filter(r -> {
+        List<Row> matches = allRows().stream().filter(r -> {
             if (changesOnly && r.change() == null) return false;
             if (q.isEmpty()) return mode == Mode.ALL;
             return switch (mode) {
-                case MAKES -> r.holder() != null && RecipeUsage.produces(r.holder().value(), items, registries);
+                case MAKES -> r.holder() != null && items.contains(r.icon().getItem());
                 case USES -> r.holder() != null && RecipeUsage.usesAny(r.holder().value(), items);
-                case ALL -> r.id().toString().contains(q) || r.type().contains(q)
-                        || r.icon().getHoverName().getString().toLowerCase(Locale.ROOT).contains(q)
-                        || BuiltInRegistries.ITEM.getKey(r.icon().getItem()).toString().contains(q);
+                case ALL -> r.search().contains(q);
             };
-        }).limit(2000).toList();
-        list.set(rows);
-        resultCount = rows.size();
+        }).toList();
+        list.set(matches.size() > 2000 ? matches.subList(0, 2000) : matches);
+        resultCount = matches.size();
         select(null);
     }
 
@@ -213,9 +223,10 @@ public class RecipeBrowserScreen extends Screen {
         super.tick();
         undo.active = ClientState.canUndo();
 
-        int hash = ClientState.changes().hashCode() ^ System.identityHashCode(minecraft.level.getRecipeManager().getRecipes());
+        int hash = currentHash();
         if (hash != lastHash) {
             lastHash = hash;
+            cachedRows = null;
             ResourceLocation keep = selected == null ? null : selected.id();
             refresh();
             if (keep != null) list.children().stream().filter(e -> e.row.id().equals(keep)).findFirst().ifPresent(e -> {
@@ -226,6 +237,10 @@ public class RecipeBrowserScreen extends Screen {
     }
 
     private int lastHash;
+
+    private int currentHash() {
+        return ClientState.changes().hashCode() ^ System.identityHashCode(minecraft.level.getRecipeManager().getRecipes());
+    }
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {

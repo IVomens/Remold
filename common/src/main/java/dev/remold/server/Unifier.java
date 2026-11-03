@@ -65,7 +65,10 @@ public final class Unifier {
 
             Map<ResourceLocation, JsonObject> changed = new LinkedHashMap<>();
             Map<ResourceLocation, JsonObject> current = new HashMap<>();
+            Set<Item> involved = new HashSet<>();
+            for (ResourceLocation tag : settings.groups().keySet()) involved.addAll(members(server, tag));
             for (RecipeHolder<?> h : server.getRecipeManager().getRecipes()) {
+                if (!dev.remold.core.RecipeUsage.mayInvolve(h.value(), involved, server.registryAccess())) continue;
                 Recipe.CODEC.encodeStart(ops, h.value()).result().filter(JsonElement::isJsonObject)
                         .ifPresent(json -> current.put(h.id(), json.getAsJsonObject()));
             }

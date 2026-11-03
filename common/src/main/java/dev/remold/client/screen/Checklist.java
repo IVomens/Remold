@@ -30,23 +30,25 @@ public final class Checklist {
     private Checklist() {}
 
     public static List<String> mods() {
-        TreeSet<String> mods = new TreeSet<>();
-        for (Item item : BuiltInRegistries.ITEM) {
-            if (item != Items.AIR) mods.add(BuiltInRegistries.ITEM.getKey(item).getNamespace());
-        }
-        List<String> list = new ArrayList<>(mods);
+        items("");
+        List<String> list = new ArrayList<>(new TreeSet<>(byMod.keySet()));
         list.sort(Comparator.comparing((String m) -> m.equals("minecraft")).thenComparing(m -> dev.remold.platform.Services.PLATFORM.modName(m).toLowerCase()));
         return list;
     }
 
+    private static Map<String, List<Item>> byMod;
+
     public static List<Item> items(String mod) {
-        List<Item> items = new ArrayList<>();
-        for (Item item : BuiltInRegistries.ITEM) {
-            ResourceLocation id = BuiltInRegistries.ITEM.getKey(item);
-            if (item != Items.AIR && id.getNamespace().equals(mod)) items.add(item);
+        if (byMod == null) {
+            Map<String, List<Item>> map = new HashMap<>();
+            for (Item item : BuiltInRegistries.ITEM) {
+                if (item == Items.AIR) continue;
+                map.computeIfAbsent(BuiltInRegistries.ITEM.getKey(item).getNamespace(), k -> new ArrayList<>()).add(item);
+            }
+            map.values().forEach(list -> list.sort(Comparator.comparing(i -> BuiltInRegistries.ITEM.getKey(i).getPath())));
+            byMod = map;
         }
-        items.sort(Comparator.comparing(i -> BuiltInRegistries.ITEM.getKey(i).getPath()));
-        return items;
+        return byMod.getOrDefault(mod, List.of());
     }
 
     private static Map<Item, RecipeHolder<?>> made() {

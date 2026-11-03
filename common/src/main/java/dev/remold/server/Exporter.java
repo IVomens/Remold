@@ -23,6 +23,7 @@ public final class Exporter {
 
     public static Result export(MinecraftServer server) throws IOException {
         RemoldPack pack = RemoldPack.get(server);
+        pack.flush();
         Path outDir = server.getServerDirectory().resolve("remold-exports");
         Files.createDirectories(outDir);
         String stamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));

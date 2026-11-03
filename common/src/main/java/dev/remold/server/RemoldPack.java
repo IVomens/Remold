@@ -39,7 +39,8 @@ public final class RemoldPack {
     public static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 
     private static final Codec<List<ChangeEntry>> MANIFEST_CODEC = ChangeEntry.CODEC.listOf();
-    private static final int MAX_HISTORY = 1000;
+    private static final int MAX_UNDO_STEPS = 100;
+    private static final int MAX_HISTORY_ENTRIES = 250_000;
     private static final Codec<List<HistoryEntry>> HISTORY_CODEC = HistoryEntry.CODEC.listOf();
     private static final Codec<Map<ResourceLocation, TagEdit>> TAGS_CODEC =
             Codec.unboundedMap(ResourceLocation.CODEC, TagEdit.CODEC);
@@ -85,12 +86,37 @@ public final class RemoldPack {
         RemoldConfig.load();
     }
 
+    public void flush() {
+        try {
+            if (dirtyManifest) {
+                dirtyManifest = false;
+                writeManifest();
+            }
+            if (dirtyHistory) {
+                dirtyHistory = false;
+                writeHistory();
+            }
+            if (dirtyTags) {
+                dirtyTags = false;
+                writeTags();
+            }
+            if (dirtyAnnotations) {
+                dirtyAnnotations = false;
+                writeAnnotations();
+            }
+        } catch (IOException e) {
+            Remold.LOG.error("Could not save Remold's files", e);
+        }
+    }
+
     public static void onServerTick(MinecraftServer server) {
+        if (instance != null && instance.server == server) instance.flush();
         Unifier.tick(server);
         Gates.tick(server);
     }
 
     public static void onServerStopped() {
+        if (instance != null) instance.flush();
         Gates.onServerStopped();
         instance = null;
     }
@@ -160,21 +186,50 @@ public final class RemoldPack {
         }
     }
 
-    private void saveManifest() throws IOException {
+    private boolean dirtyManifest;
+
+    private void saveManifest() {
+        dirtyManifest = true;
+    }
+
+    private void writeManifest() throws IOException {
         List<ChangeEntry> list = new ArrayList<>(changes.values());
         list.sort(Comparator.comparing(c -> c.id().toString()));
         writeJson(root.resolve("remold_manifest.json"),
                 MANIFEST_CODEC.encodeStart(JsonOps.INSTANCE, list).getOrThrow());
     }
 
-    private void saveAnnotations() throws IOException {
+    private boolean dirtyAnnotations;
+
+    private void saveAnnotations() {
+        dirtyAnnotations = true;
+    }
+
+    private void writeAnnotations() throws IOException {
         ensurePack();
         writeJson(root.resolve("remold_annotations.json"),
                 ANNOTATIONS_CODEC.encodeStart(JsonOps.INSTANCE, annotations).getOrThrow());
     }
 
-    private void saveHistory() throws IOException {
-        while (history.size() > MAX_HISTORY) history.removeFirst();
+    private boolean dirtyHistory;
+
+    private void saveHistory() {
+        dirtyHistory = true;
+    }
+
+    private void trimHistory() {
+        if (history.isEmpty()) return;
+        long newest = history.getLast().batch();
+        while (!history.isEmpty()) {
+            long oldest = history.getFirst().batch();
+            if (oldest == newest) break;
+            if (newest - oldest < MAX_UNDO_STEPS && history.size() <= MAX_HISTORY_ENTRIES) break;
+            while (!history.isEmpty() && history.getFirst().batch() == oldest) history.removeFirst();
+        }
+    }
+
+    private void writeHistory() throws IOException {
+        trimHistory();
         writeJson(root.resolve("remold_history.json"), HISTORY_CODEC.encodeStart(JsonOps.INSTANCE, history).getOrThrow());
     }
 
@@ -368,7 +423,13 @@ public final class RemoldPack {
         return root.resolve("data").resolve(tag.getNamespace()).resolve("tags").resolve("item").resolve(tag.getPath() + ".json");
     }
 
-    private void saveTags() throws IOException {
+    private boolean dirtyTags;
+
+    private void saveTags() {
+        dirtyTags = true;
+    }
+
+    private void writeTags() throws IOException {
         writeJson(root.resolve("remold_tags.json"), TAGS_CODEC.encodeStart(JsonOps.INSTANCE, tagEdits).getOrThrow());
     }
 
@@ -445,6 +506,7 @@ public final class RemoldPack {
     }
 
     public CompletableFuture<Void> apply() {
+        flush();
         if (reloading != null && !reloading.isDone()) {
             reloadQueued = true;
             return reloading;

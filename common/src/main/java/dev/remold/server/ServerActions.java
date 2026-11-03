@@ -24,6 +24,7 @@ import net.minecraft.world.item.crafting.RecipeHolder;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 public final class ServerActions {
@@ -218,7 +219,9 @@ public final class ServerActions {
                     boolean inputs = payload.scope() != 2, outputs = payload.scope() != 1;
                     ItemStack fromStack = new ItemStack(from.get());
                     int viaTag = 0;
+                    Set<net.minecraft.world.item.Item> fromSet = Set.of(from.get());
                     for (RecipeHolder<?> holder : recipes) {
+                        if (!RecipeUsage.mayInvolve(holder.value(), fromSet, server.registryAccess())) continue;
                         var encoded = Recipe.CODEC.encodeStart(ops, holder.value()).result();
                         if (encoded.isEmpty() || !encoded.get().isJsonObject()) continue;
                         JsonObject replaced = TemplateRecipe.of(holder.id(), encoded.get().getAsJsonObject())

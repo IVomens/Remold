@@ -33,6 +33,15 @@ public final class RecipeUsage {
         return false;
     }
 
+    public static boolean mayInvolve(Recipe<?> recipe, Set<Item> items, net.minecraft.core.HolderLookup.Provider registries) {
+        try {
+            if (recipe.getIngredients().isEmpty()) return true;
+        } catch (Exception e) {
+            return true;
+        }
+        return usesAny(recipe, items) || produces(recipe, items, registries);
+    }
+
     public static boolean produces(Recipe<?> recipe, Set<Item> items, net.minecraft.core.HolderLookup.Provider registries) {
         try {
             ItemStack result = recipe.getResultItem(registries);

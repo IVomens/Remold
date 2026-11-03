@@ -57,7 +57,7 @@ public final class SourceFiles {
                     String rel = scripts.relativize(file).toString().replace('\\', '/');
                     int count = 0;
                     try {
-                        count = KubeJsScript.parse(read(file)).size();
+                        count = script(file).size();
                     } catch (IOException ignored) {
                     }
                     result.add(new Payloads.SourceInfo(KUBEJS + rel, "kubejs", rel, count));
@@ -74,9 +74,9 @@ public final class SourceFiles {
                     if (name.equals(RemoldPack.FOLDER)) continue;
                     try {
                         if (Files.isDirectory(child)) {
-                            result.add(new Payloads.SourceInfo(PACK + name, "datapack", name, packRecipes(child).size()));
+                            result.add(new Payloads.SourceInfo(PACK + name, "datapack", name, countPack(child)));
                         } else if (name.endsWith(".zip")) {
-                            result.add(new Payloads.SourceInfo(ZIP + name, "zip", name, zipRecipes(child).size()));
+                            result.add(new Payloads.SourceInfo(ZIP + name, "zip", name, countZip(child)));
                         }
                     } catch (IOException e) {
                         Remold.LOG.warn("Could not read datapack {}", child, e);
@@ -87,6 +87,40 @@ public final class SourceFiles {
             }
         }
         return result;
+    }
+
+    private record Parsed(long modified, long size, List<KubeJsScript.Entry> entries) {}
+
+    private static final java.util.Map<Path, Parsed> SCRIPTS = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static List<KubeJsScript.Entry> script(Path file) throws IOException {
+        long modified = Files.getLastModifiedTime(file).toMillis();
+        long size = Files.size(file);
+        Parsed cached = SCRIPTS.get(file);
+        if (cached != null && cached.modified() == modified && cached.size() == size) return cached.entries();
+        List<KubeJsScript.Entry> entries = KubeJsScript.parse(read(file));
+        SCRIPTS.put(file, new Parsed(modified, size, entries));
+        return entries;
+    }
+
+    private static int countPack(Path pack) throws IOException {
+        Path data = pack.resolve("data");
+        if (!Files.isDirectory(data)) return 0;
+        try (Stream<Path> files = Files.walk(data)) {
+            return (int) files.filter(f -> f.toString().endsWith(".json") && idOf(data.relativize(f).toString().replace('\\', '/')) != null).count();
+        }
+    }
+
+    private static int countZip(Path zip) throws IOException {
+        int count = 0;
+        try (java.util.zip.ZipFile file = new java.util.zip.ZipFile(zip.toFile())) {
+            var e = file.entries();
+            while (e.hasMoreElements()) {
+                String name = e.nextElement().getName().replace('\\', '/');
+                if (name.startsWith("data/") && name.endsWith(".json") && idOf(name.substring("data/".length())) != null) count++;
+            }
+        }
+        return count;
     }
 
     private static String read(Path file) throws IOException {
@@ -172,7 +206,7 @@ public final class SourceFiles {
     public static List<Payloads.SourceEntry> entries(MinecraftServer server, String key) throws IOException {
         List<Payloads.SourceEntry> list = new ArrayList<>();
         if (key.startsWith(KUBEJS)) {
-            List<KubeJsScript.Entry> entries = KubeJsScript.parse(read(resolve(scripts(server), key.substring(KUBEJS.length()))));
+            List<KubeJsScript.Entry> entries = script(resolve(scripts(server), key.substring(KUBEJS.length())));
             for (int i = 0; i < entries.size(); i++) {
                 KubeJsScript.Entry e = entries.get(i);
                 String id = e.id() != null ? e.id() : scriptId(key, i).toString();
@@ -190,33 +224,39 @@ public final class SourceFiles {
 
     public static void handleRequest(ServerPlayer player, Payloads.SourceRequest request) {
         MinecraftServer server = player.server;
-        try {
-            if (request.key().isEmpty()) {
-                Services.PLATFORM.sendToPlayer(player, new Payloads.SourceList(list(server)));
-            } else if (request.index() < 0) {
-                Services.PLATFORM.sendToPlayer(player, new Payloads.SourceEntries(request.key(), entries(server, request.key())));
-            } else {
-                sendRecipe(player, request.key(), request.index());
+        net.minecraft.Util.backgroundExecutor().execute(() -> {
+            try {
+                if (request.key().isEmpty()) {
+                    var files = list(server);
+                    server.execute(() -> Services.PLATFORM.sendToPlayer(player, new Payloads.SourceList(files)));
+                } else if (request.index() < 0) {
+                    var entries = entries(server, request.key());
+                    server.execute(() -> Services.PLATFORM.sendToPlayer(player, new Payloads.SourceEntries(request.key(), entries)));
+                } else {
+                    sendRecipe(player, request.key(), request.index());
+                }
+            } catch (Exception e) {
+                server.execute(() -> ServerActions.notice(player, false, "failed", "plain", String.valueOf(e.getMessage())));
             }
-        } catch (IOException e) {
-            ServerActions.notice(player, false, "failed", "plain", String.valueOf(e.getMessage()));
-        }
+        });
     }
 
     private static void sendRecipe(ServerPlayer player, String key, int index) throws IOException {
         MinecraftServer server = player.server;
         if (key.startsWith(KUBEJS)) {
-            List<KubeJsScript.Entry> entries = KubeJsScript.parse(read(resolve(scripts(server), key.substring(KUBEJS.length()))));
+            List<KubeJsScript.Entry> entries = script(resolve(scripts(server), key.substring(KUBEJS.length())));
             if (index >= entries.size() || !entries.get(index).editable()) throw new IOException("This recipe can't be edited in Remold");
             KubeJsScript.Entry e = entries.get(index);
             String id = e.id() != null ? e.id() : scriptId(key, index).toString();
-            Services.PLATFORM.sendToPlayer(player, new Payloads.SourceRecipe(key, index, id, e.json().toString()));
+            Payloads.SourceRecipe payload = new Payloads.SourceRecipe(key, index, id, e.json().toString());
+            server.execute(() -> Services.PLATFORM.sendToPlayer(player, payload));
             return;
         }
         List<Recipe0> recipes = recipes(server, key);
         if (index >= recipes.size() || !problemOf(recipes.get(index).json()).isEmpty()) throw new IOException("This recipe can't be edited in Remold");
         Recipe0 r = recipes.get(index);
-        Services.PLATFORM.sendToPlayer(player, new Payloads.SourceRecipe(key, index, r.id().toString(), r.json()));
+        Payloads.SourceRecipe payload = new Payloads.SourceRecipe(key, index, r.id().toString(), r.json());
+        server.execute(() -> Services.PLATFORM.sendToPlayer(player, payload));
     }
 
     public static void handleSave(ServerPlayer player, Payloads.SourceSave save) {
@@ -263,9 +303,6 @@ public final class SourceFiles {
             return;
         }
         ServerActions.finish(player, save.apply(), "source_saved", name);
-        try {
-            Services.PLATFORM.sendToPlayer(player, new Payloads.SourceEntries(key, entries(server, key)));
-        } catch (IOException ignored) {
-        }
+        handleRequest(player, new Payloads.SourceRequest(key, -1));
     }
 }
