@@ -418,6 +418,10 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        return scrollAmount(mouseX, mouseY, scrollY) || super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+    }
+
+    public boolean scrollAmount(double mouseX, double mouseY, double scrollY) {
         GhostSlot slot = ghostAt(mouseX, mouseY);
         if (slot != null && !slot.output() && countable(slot.index()) && !state.inputs[slot.index()].isEmpty()) {
             ItemStack stack = state.inputs[slot.index()].stack();
@@ -433,7 +437,7 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
             }
             return true;
         }
-        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+        return false;
     }
 
     private void addSlot(boolean output) {
