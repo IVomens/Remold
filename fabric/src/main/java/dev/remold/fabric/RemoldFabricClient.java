@@ -3,6 +3,7 @@ package dev.remold.fabric;
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.remold.client.ClientState;
 import dev.remold.client.RemoldClient;
+import dev.remold.client.screen.EditorScreen;
 import dev.remold.fabric.mixin.AbstractContainerScreenAccessor;
 import dev.remold.network.Payloads;
 import net.fabricmc.api.ClientModInitializer;
@@ -12,6 +13,7 @@ import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
+import net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents;
 import net.fabricmc.fabric.api.client.screen.v1.Screens;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
@@ -49,6 +51,9 @@ public class RemoldFabricClient implements ClientModInitializer {
                 AbstractContainerScreenAccessor accessor = (AbstractContainerScreenAccessor) container;
                 var button = RemoldClient.inventoryButton(screen, accessor::remold$getLeftPos, accessor::remold$getTopPos);
                 if (button != null) Screens.getButtons(screen).add(button);
+            }
+            if (screen instanceof EditorScreen editor) {
+                ScreenMouseEvents.allowMouseScroll(screen).register((s, mouseX, mouseY, scrollX, scrollY) -> !editor.scrollAmount(mouseX, mouseY, scrollY));
             }
         });
         ItemTooltipCallback.EVENT.register((stack, context, flag, lines) -> RemoldClient.appendTooltip(stack, lines));

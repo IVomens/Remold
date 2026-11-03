@@ -27,7 +27,7 @@ import java.util.Map;
 import java.util.Set;
 
 public final class TemplateRecipe {
-    public enum NodeStyle { INGREDIENT_ITEM, INGREDIENT_TAG, STACK_ID, STACK_ITEM, PLAIN_STRING }
+    public enum NodeStyle { INGREDIENT_ITEM, INGREDIENT_TAG, STACK_ID, STACK_ITEM, PLAIN_STRING, PLAIN_TAG }
 
     public record Node(List<Object> path, NodeStyle style, boolean output, @org.jetbrains.annotations.Nullable List<Object> countPath) {
         public Node(List<Object> path, NodeStyle style, boolean output) {
@@ -87,6 +87,12 @@ public final class TemplateRecipe {
         return id != null && BuiltInRegistries.ITEM.containsKey(id) && BuiltInRegistries.ITEM.get(id) != Items.AIR;
     }
 
+    private static boolean isTagString(JsonElement e) {
+        if (!e.isJsonPrimitive() || !e.getAsJsonPrimitive().isString()) return false;
+        String s = e.getAsString();
+        return s.startsWith("#") && ResourceLocation.tryParse(s.substring(1)) != null;
+    }
+
     private static boolean outputKey(String key) {
         String k = key.toLowerCase(Locale.ROOT);
         return k.contains("result") || k.contains("output") || k.contains("product");
@@ -133,6 +139,8 @@ public final class TemplateRecipe {
             JsonPrimitive p = child.getAsJsonPrimitive();
             if (isItem(p) && (inOutput || inputHint(path))) {
                 add(new Node(path, NodeStyle.PLAIN_STRING, inOutput));
+            } else if (!inOutput && isTagString(p) && inputHint(path)) {
+                add(new Node(path, NodeStyle.PLAIN_TAG, false));
             } else if (key == null || !SKIPPED_KEYS.contains(key)) {
                 params.add(new Param(path, p));
             }
@@ -200,7 +208,7 @@ public final class TemplateRecipe {
         List<List<Object>> countPaths = new ArrayList<>();
         for (int i = 0; i < inputs.size(); i++) {
             Node node = inputs.get(i);
-            if (node.style() == NodeStyle.PLAIN_STRING || node.style() == NodeStyle.STACK_ID) continue;
+            if (node.style() == NodeStyle.STACK_ID) continue;
             List<Object> found = countPathFor(node.path());
             if (found != null) {
                 inputs.set(i, new Node(node.path(), node.style(), false, found));
@@ -233,8 +241,9 @@ public final class TemplateRecipe {
     public GhostIngredient initialInput(Node node) {
         JsonElement e = get(json, node.path());
         int count = node.countable() ? Math.max(1, get(json, node.countPath()).getAsInt()) : 1;
-        if (node.style() == NodeStyle.INGREDIENT_TAG) {
-            TagKey<Item> tag = TagKey.create(Registries.ITEM, ResourceLocation.parse(e.getAsJsonObject().get("tag").getAsString()));
+        if (node.style() == NodeStyle.INGREDIENT_TAG || node.style() == NodeStyle.PLAIN_TAG) {
+            String name = node.style() == NodeStyle.PLAIN_TAG ? e.getAsString().substring(1) : e.getAsJsonObject().get("tag").getAsString();
+            TagKey<Item> tag = TagKey.create(Registries.ITEM, ResourceLocation.parse(name));
             ItemStack first = GhostIngredient.tagItems(tag).stream().findFirst().map(ItemStack::new).orElse(new ItemStack(Items.BARRIER));
             return new GhostIngredient(first.copyWithCount(count), tag);
         }
@@ -298,8 +307,10 @@ public final class TemplateRecipe {
                 return DataResult.error(() -> RemoldText.error("input_empty", slot));
             }
             String itemId = BuiltInRegistries.ITEM.getKey(ghost.stack().getItem()).toString();
-            if (node.style() == NodeStyle.PLAIN_STRING) {
-                set(copy, node.path(), new JsonPrimitive(itemId));
+            if (node.style() == NodeStyle.PLAIN_STRING || node.style() == NodeStyle.PLAIN_TAG) {
+                String value = node.style() == NodeStyle.PLAIN_TAG && ghost.tag() != null ? "#" + ghost.tag().location() : itemId;
+                set(copy, node.path(), new JsonPrimitive(value));
+                if (node.countable()) set(copy, node.countPath(), new JsonPrimitive(Math.max(1, ghost.stack().getCount())));
                 continue;
             }
             JsonObject obj = get(copy, node.path()).getAsJsonObject();
@@ -362,7 +373,7 @@ public final class TemplateRecipe {
         if (inInputs) nodes.addAll(inputs);
         if (inOutputs) nodes.addAll(outputs);
         for (Node node : nodes) {
-            if (node.style() == NodeStyle.INGREDIENT_TAG) continue;
+            if (node.style() == NodeStyle.INGREDIENT_TAG || node.style() == NodeStyle.PLAIN_TAG) continue;
             JsonElement e = get(copy, node.path());
             if (node.style() == NodeStyle.PLAIN_STRING) {
                 if (e.getAsString().equals(from)) {
@@ -395,6 +406,40 @@ public final class TemplateRecipe {
             }
         }
         return changed ? copy : null;
+    }
+
+    public static JsonObject withOptionalCounts(ResourceLocation id, JsonObject json, net.minecraft.resources.RegistryOps<JsonElement> ops) {
+        TemplateRecipe template = new TemplateRecipe(id, json);
+        List<List<Object>> candidates = new ArrayList<>();
+        for (Node node : template.inputs) {
+            if (node.countable() || node.style() == NodeStyle.STACK_ID) continue;
+            List<Object> element = elementPath(node.path());
+            if (element == null || !get(json, element).isJsonObject() || get(json, element).getAsJsonObject().has("count")) continue;
+            List<Object> candidate = append(element, "count");
+            if (!candidates.contains(candidate)) candidates.add(candidate);
+        }
+        if (candidates.isEmpty()) return json;
+        JsonObject probe = json.deepCopy();
+        for (List<Object> c : candidates) set(probe, c, new JsonPrimitive(2));
+        JsonElement back;
+        try {
+            var decoded = Recipe.CODEC.parse(ops, probe).result();
+            if (decoded.isEmpty()) return json;
+            var encoded = Recipe.CODEC.encodeStart(ops, decoded.get()).result();
+            if (encoded.isEmpty()) return json;
+            back = encoded.get();
+        } catch (RuntimeException e) {
+            return json;
+        }
+        JsonObject result = json.deepCopy();
+        for (List<Object> c : candidates) {
+            try {
+                JsonElement value = get(back, c);
+                if (isNumber(value) && value.getAsInt() == 2) set(result, c, new JsonPrimitive(1));
+            } catch (RuntimeException ignored) {
+            }
+        }
+        return result;
     }
 
     static JsonElement get(JsonElement root, List<Object> path) {

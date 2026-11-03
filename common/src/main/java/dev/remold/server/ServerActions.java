@@ -161,9 +161,13 @@ public final class ServerActions {
         }
         RegistryOps<JsonElement> ops = server.registryAccess().createSerializationContext(JsonOps.INSTANCE);
         var json = Recipe.CODEC.encodeStart(ops, holder.get().value());
-        Services.PLATFORM.sendToPlayer(player, json.error().isPresent()
-                ? new Payloads.TemplateJson(payload.id(), "", json.error().get().message())
-                : new Payloads.TemplateJson(payload.id(), json.getOrThrow().toString(), ""));
+        if (json.error().isPresent()) {
+            Services.PLATFORM.sendToPlayer(player, new Payloads.TemplateJson(payload.id(), "", json.error().get().message()));
+            return;
+        }
+        JsonElement encoded = json.getOrThrow();
+        if (encoded.isJsonObject()) encoded = dev.remold.core.TemplateRecipe.withOptionalCounts(payload.id(), encoded.getAsJsonObject(), ops);
+        Services.PLATFORM.sendToPlayer(player, new Payloads.TemplateJson(payload.id(), encoded.toString(), ""));
     }
 
     public static void handleTag(ServerPlayer player, Payloads.SetTag payload) {
