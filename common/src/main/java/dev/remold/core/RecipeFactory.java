@@ -100,6 +100,24 @@ public final class RecipeFactory {
         state.params = template.params.stream().map(p -> p.original().getAsString()).toArray(String[]::new);
     }
 
+    public static boolean addTemplateSlot(EditorState state, boolean output, HolderLookup.Provider registries) {
+        TemplateRecipe old = state.template;
+        if (old == null || !old.canAdd(output)) return false;
+        TemplateRecipe next = old.withExtraSlot(output);
+        if (next == old) return false;
+        java.util.Map<List<Object>, GhostIngredient> inputs = new java.util.HashMap<>();
+        for (int i = 0; i < old.inputs.size(); i++) inputs.put(old.inputs.get(i).path(), state.inputs[i]);
+        java.util.Map<List<Object>, ItemStack> outputs = new java.util.HashMap<>();
+        for (int i = 0; i < old.outputs.size(); i++) outputs.put(old.outputs.get(i).path(), state.outputs[i]);
+        java.util.Map<List<Object>, String> params = new java.util.HashMap<>();
+        for (int i = 0; i < old.params.size(); i++) params.put(old.params.get(i).path(), state.params[i]);
+        state.template = next;
+        state.inputs = next.inputs.stream().map(n -> inputs.getOrDefault(n.path(), GhostIngredient.EMPTY)).toArray(GhostIngredient[]::new);
+        state.outputs = next.outputs.stream().map(n -> outputs.getOrDefault(n.path(), ItemStack.EMPTY)).toArray(ItemStack[]::new);
+        state.params = next.params.stream().map(p -> params.getOrDefault(p.path(), p.original().getAsString())).toArray(String[]::new);
+        return true;
+    }
+
     public static DataResult<JsonObject> build(EditorState state, HolderLookup.Provider registries) {
         Machine.Kind kind = state.machine.kind();
         if (kind == Machine.Kind.TEMPLATE) {

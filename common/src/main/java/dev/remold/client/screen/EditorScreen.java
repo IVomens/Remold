@@ -146,6 +146,22 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
             });
             addRenderableWidget(xp);
         }
+        if (template && state.template != null) {
+            int n = state.inputs.length;
+            if (n < MAX_TEMPLATE_INPUTS && state.template.canAdd(false)) {
+                Button add = Button.builder(Component.literal("+"), b -> addSlot(false))
+                        .bounds(x + 8 + (n % 6) * 18, y + 38 + (n / 6) * 18, 18, 18).build();
+                add.setTooltip(Tooltip.create(RemoldText.tr("editor.add_input")));
+                addRenderableWidget(add);
+            }
+            int m = state.outputs.length;
+            if (m < MAX_TEMPLATE_OUTPUTS && state.template.canAdd(true)) {
+                Button add = Button.builder(Component.literal("+"), b -> addSlot(true))
+                        .bounds(x + 150 + (m % 2) * 18, y + 38 + (m / 2) * 18, 18, 18).build();
+                add.setTooltip(Tooltip.create(RemoldText.tr("editor.add_output")));
+                addRenderableWidget(add);
+            }
+        }
         if (template && state.template != null && !state.template.params.isEmpty()) {
             Button params = Button.builder(RemoldText.tr("editor.values"), b -> minecraft.setScreen(new ParamsScreen(this)))
                     .bounds(x + 144, y + 80, 48, 16).build();
@@ -418,6 +434,10 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+    }
+
+    private void addSlot(boolean output) {
+        if (RecipeFactory.addTemplateSlot(state, output, registries())) rebuildWidgets();
     }
 
     private boolean countable(int input) {

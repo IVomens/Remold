@@ -168,6 +168,34 @@ public final class TemplateRecipe {
         return copy;
     }
 
+    @org.jetbrains.annotations.Nullable
+    public static List<Object> elementPath(List<Object> path) {
+        for (int i = path.size() - 1; i >= 0; i--) {
+            if (path.get(i) instanceof Integer) return new ArrayList<>(path.subList(0, i + 1));
+        }
+        return null;
+    }
+
+    public boolean canAdd(boolean output) {
+        for (Node node : output ? outputs : inputs) {
+            if (elementPath(node.path()) != null) return true;
+        }
+        return false;
+    }
+
+    public TemplateRecipe withExtraSlot(boolean output) {
+        List<Node> nodes = output ? outputs : inputs;
+        for (int i = nodes.size() - 1; i >= 0; i--) {
+            List<Object> element = elementPath(nodes.get(i).path());
+            if (element == null) continue;
+            JsonObject copy = json.deepCopy();
+            JsonElement array = get(copy, element.subList(0, element.size() - 1));
+            array.getAsJsonArray().add(get(copy, element).deepCopy());
+            return new TemplateRecipe(sourceId, copy);
+        }
+        return this;
+    }
+
     private void findCounts() {
         List<List<Object>> countPaths = new ArrayList<>();
         for (int i = 0; i < inputs.size(); i++) {
@@ -242,7 +270,7 @@ public final class TemplateRecipe {
 
     public DataResult<JsonObject> build(GhostIngredient[] inputs, ItemStack[] outputs, String[] paramValues, HolderLookup.Provider registries) {
         JsonObject copy = json.deepCopy();
-        List<List<Object>> removals = new ArrayList<>();
+        java.util.LinkedHashSet<List<Object>> removals = new java.util.LinkedHashSet<>();
 
         for (int i = 0; i < this.params.size(); i++) {
             Param param = this.params.get(i);
@@ -265,8 +293,9 @@ public final class TemplateRecipe {
             Node node = this.inputs.get(i);
             GhostIngredient ghost = inputs[i];
             if (ghost.isEmpty()) {
-                if (node.path().getLast() instanceof Integer) {
-                    removals.add(node.path());
+                List<Object> element = elementPath(node.path());
+                if (element != null) {
+                    removals.add(element);
                     continue;
                 }
                 int slot = i + 1;
@@ -293,8 +322,9 @@ public final class TemplateRecipe {
             Node node = this.outputs.get(i);
             ItemStack stack = outputs[i];
             if (stack.isEmpty()) {
-                if (node.path().getLast() instanceof Integer) {
-                    removals.add(node.path());
+                List<Object> element = elementPath(node.path());
+                if (element != null) {
+                    removals.add(element);
                     continue;
                 }
                 return DataResult.error(() -> RemoldText.error("output_empty"));
@@ -319,8 +349,9 @@ public final class TemplateRecipe {
             }
         }
 
-        removals.sort(Comparator.comparing((List<Object> p) -> (Integer) p.getLast()).reversed());
-        for (List<Object> path : removals) {
+        List<List<Object>> ordered = new ArrayList<>(removals);
+        ordered.sort(Comparator.comparing((List<Object> p) -> (Integer) p.getLast()).reversed());
+        for (List<Object> path : ordered) {
             JsonElement parent = get(copy, path.subList(0, path.size() - 1));
             if (parent.isJsonArray()) parent.getAsJsonArray().remove((int) (Integer) path.getLast());
         }
