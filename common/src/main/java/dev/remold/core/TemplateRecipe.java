@@ -39,7 +39,7 @@ public final class TemplateRecipe {
         }
     }
 
-    private static final List<String> COUNT_KEYS = List.of("count", "amount");
+    private static final List<String> COUNT_KEYS = List.of("count", "amount", "size", "stacksize", "stack_size", "quantity", "qty");
 
     public record Param(List<Object> path, JsonPrimitive original) {
         public String label() {
@@ -212,19 +212,15 @@ public final class TemplateRecipe {
 
     @org.jetbrains.annotations.Nullable
     private List<Object> countPathFor(List<Object> path) {
-        JsonElement own = get(json, path);
-        if (own.isJsonObject()) {
-            for (String key : COUNT_KEYS) {
-                if (isNumber(own.getAsJsonObject().get(key))) return append(path, key);
-            }
-        }
-        if (path.size() >= 2 && path.getLast() instanceof String) {
-            List<Object> parentPath = path.subList(0, path.size() - 1);
-            JsonElement parent = get(json, parentPath);
-            if (parent.isJsonObject() && parent.getAsJsonObject().size() <= 3) {
-                for (String key : COUNT_KEYS) {
-                    if (isNumber(parent.getAsJsonObject().get(key))) return append(new ArrayList<>(parentPath), key);
-                }
+        List<Object> element = elementPath(path);
+        int stop = element != null ? element.size() : Math.max(1, path.size() - 1);
+        for (int end = path.size(); end >= stop; end--) {
+            List<Object> at = new ArrayList<>(path.subList(0, end));
+            JsonElement e = get(json, at);
+            if (!e.isJsonObject()) continue;
+            if (element == null && end < path.size() && e.getAsJsonObject().size() > 3) continue;
+            for (String key : e.getAsJsonObject().keySet()) {
+                if (COUNT_KEYS.contains(key.toLowerCase(java.util.Locale.ROOT)) && isNumber(e.getAsJsonObject().get(key))) return append(at, key);
             }
         }
         return null;
