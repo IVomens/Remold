@@ -16,10 +16,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-/**
- * Recipe gating: a recipe can require an advancement, or a stage ({@code stage:<name>}) granted with
- * {@code /remold stage grant}. Locked recipes give no result in the crafting table or inventory grid.
- */
 public final class Gates {
     public static final String STAGE_PREFIX = "stage:";
     private static final Map<UUID, Set<String>> lastSent = new HashMap<>();
@@ -27,7 +23,6 @@ public final class Gates {
 
     private Gates() {}
 
-    /** Whether the player has met a requirement. Unknown advancements don't lock anything (with a warning). */
     public static boolean meets(ServerPlayer player, String requirement) {
         if (requirement.startsWith(STAGE_PREFIX)) {
             return RemoldPack.get(player.server).stages(player.getUUID()).contains(requirement.substring(STAGE_PREFIX.length()));
@@ -55,7 +50,6 @@ public final class Gates {
         return result;
     }
 
-    /** Sends the locks and what this player has unlocked (for padlocks in recipe viewers). */
     public static void sync(ServerPlayer player) {
         Map<ResourceLocation, String> gates = RemoldPack.get(player.server).gates();
         Set<String> unlocked = unlocked(player, gates);
@@ -67,7 +61,6 @@ public final class Gates {
         server.getPlayerList().getPlayers().forEach(Gates::sync);
     }
 
-    /** Every 2 seconds, tell players about requirements they've just met (advancements, stages). */
     public static void tick(MinecraftServer server) {
         if (server.getTickCount() % 40 != 0) return;
         Map<ResourceLocation, String> gates = RemoldPack.get(server).gates();

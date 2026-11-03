@@ -1,5 +1,3 @@
-// Loader-agnostic code. Compiles against vanilla Minecraft only (NeoForm, Mojang mappings),
-// which guarantees nothing in here can accidentally depend on NeoForge or Fabric.
 plugins {
     id 'net.neoforged.moddev'
 }
@@ -13,6 +11,6 @@ neoForge {
 dependencies {
     compileOnly "mezz.jei:jei-${minecraft_version}-common-api:${jei_version}"
     compileOnly "dev.emi:emi-xplat-mojmap:${emi_version}:api"
-    // Mixin annotations only; both loaders ship Mixin at runtime.
+
     compileOnly "net.fabricmc:sponge-mixin:0.16.4+mixin.0.8.7"
 }

@@ -11,7 +11,6 @@ import net.minecraft.world.item.ItemStack;
 
 import java.util.function.Consumer;
 
-/** A single ghost slot for simple screens: click to pick an item, right-click to clear. */
 public class ItemSlotWidget extends AbstractWidget {
     private final Screen owner;
     private final Consumer<ItemStack> onChange;

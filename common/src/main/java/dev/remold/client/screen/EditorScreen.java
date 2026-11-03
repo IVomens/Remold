@@ -9,6 +9,7 @@ import dev.remold.client.RemoldClient;
 import dev.remold.client.widget.IconButton;
 import dev.remold.client.widget.UiDraw;
 import dev.remold.core.ConflictCheck;
+import dev.remold.core.Machines;
 import dev.remold.core.ProgressionCheck;
 import dev.remold.core.EditorState;
 import dev.remold.core.GhostIngredient;
@@ -42,16 +43,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
-/**
- * The main editor. Recipe slots are "ghost" slots: they hold copies of items and never touch the
- * player's inventory. Items can be put in them by:
- * <ul>
- *     <li>clicking an item in your inventory (picks up a ghost copy), then clicking a slot</li>
- *     <li>the built-in item search ("Items...")</li>
- *     <li>dragging from JEI / EMI</li>
- *     <li>the "+" (move items) button on any recipe in JEI, which loads the whole recipe</li>
- * </ul>
- */
 public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
     public static final int W = 200;
     public static final int H = 236;
@@ -60,7 +51,6 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
     private static final int MAX_TEMPLATE_INPUTS = 18;
     private static final int MAX_TEMPLATE_OUTPUTS = 4;
 
-    /** A recipe slot. Coordinates are relative to the panel and point at the slot's outer corner. */
     public record GhostSlot(boolean output, int index, int x, int y, int size) {
         int itemX() {
             return x + (size - 16) / 2;
@@ -71,7 +61,6 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
         }
     }
 
-    /** Somewhere a recipe viewer can drop an item. Coordinates are absolute screen coordinates. */
     public record DropTarget(Rect2i area, Consumer<ItemStack> accept, @Nullable Consumer<TagKey<Item>> acceptTag) {}
 
     @Nullable private final Screen parent;
@@ -91,14 +80,16 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
     }
 
     RegistryAccess registries() {
-        return minecraft.level.registryAccess();
+        return net.minecraft.client.Minecraft.getInstance().level.registryAccess();
     }
 
     RecipeManager recipes() {
-        return minecraft.level.getRecipeManager();
+        return net.minecraft.client.Minecraft.getInstance().level.getRecipeManager();
     }
 
-    // ------------------------------------------------------------------ layout
+    private boolean showing() {
+        return net.minecraft.client.Minecraft.getInstance().screen == this;
+    }
 
     @Override
     protected void init() {
@@ -109,6 +100,15 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
 
         boolean template = machine.isTemplate();
         int machineWidth = template && machine.examples().size() > 1 ? 120 : 184;
+        if (state.checklistMod != null) {
+            Button nextItem = Button.builder(RemoldText.tr("editor.next"), b -> {
+                net.minecraft.world.item.Item next = Checklist.nextToDo(state.checklistMod, state.output().isEmpty() ? null : state.output().getItem());
+                if (next == null) RemoldClient.toast(true, RemoldText.tr("checklist.all_done"), RemoldText.tr("checklist.all_done.message"));
+                else startChecklistItem(state.checklistMod, next);
+            }).bounds(x + imageWidth - 52, y + 2, 46, 12).build();
+            nextItem.setTooltip(Tooltip.create(RemoldText.tr("editor.next.hint")));
+            addRenderableWidget(nextItem);
+        }
         IconButton machineButton = new IconButton(x + 8, y + 15, machineWidth, 18, machine.name(), machine::icon, false,
                 b -> minecraft.setScreen(new MachineSelectScreen(this, m -> {
                     RecipeFactory.setMachine(state, m, registries());
@@ -145,6 +145,22 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
                 }
             });
             addRenderableWidget(xp);
+        }
+        if (template && state.template != null) {
+            int n = state.inputs.length;
+            if (n < MAX_TEMPLATE_INPUTS && state.template.canAdd(false)) {
+                Button add = Button.builder(Component.literal("+"), b -> addSlot(false))
+                        .bounds(x + 8 + (n % 6) * 18, y + 38 + (n / 6) * 18, 18, 18).build();
+                add.setTooltip(Tooltip.create(RemoldText.tr("editor.add_input")));
+                addRenderableWidget(add);
+            }
+            int m = state.outputs.length;
+            if (m < MAX_TEMPLATE_OUTPUTS && state.template.canAdd(true)) {
+                Button add = Button.builder(Component.literal("+"), b -> addSlot(true))
+                        .bounds(x + 150 + (m % 2) * 18, y + 38 + (m / 2) * 18, 18, 18).build();
+                add.setTooltip(Tooltip.create(RemoldText.tr("editor.add_output")));
+                addRenderableWidget(add);
+            }
         }
         if (template && state.template != null && !state.template.params.isEmpty()) {
             Button params = Button.builder(RemoldText.tr("editor.values"), b -> minecraft.setScreen(new ParamsScreen(this)))
@@ -218,7 +234,7 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
                 for (int i = 0; i < Math.min(MAX_TEMPLATE_OUTPUTS, state.outputs.length); i++)
                     ghostSlots.add(new GhostSlot(true, i, 150 + (i % 2) * 18, 38 + (i / 2) * 18, 18));
             }
-            default -> { // single input machines
+            default -> {
                 ghostSlots.add(new GhostSlot(false, 0, 40, 56, 18));
                 ghostSlots.add(new GhostSlot(true, 0, 102, 52, 26));
             }
@@ -233,8 +249,6 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
             default -> 68;
         };
     }
-
-    // ------------------------------------------------------------------ rendering
 
     @Override
     protected void renderBg(GuiGraphics g, float partialTick, int mouseX, int mouseY) {
@@ -265,6 +279,9 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
             } else {
                 GhostIngredient ghost = state.inputs[s.index()];
                 g.renderItem(ghost.display(), ix, iy);
+                if (ghost.stack().getCount() > 1) {
+                    g.renderItemDecorations(font, ghost.display().copyWithCount(ghost.stack().getCount()), ix, iy);
+                }
                 if (ghost.tag() != null) {
                     g.pose().pushPose();
                     g.pose().translate(0, 0, 200);
@@ -286,9 +303,17 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
     @Override
     protected void renderLabels(GuiGraphics g, int mouseX, int mouseY) {
         g.drawString(font, title, 8, 5, 0xFF404040, false);
-        if (state.loadedFrom != null) {
+        int textWidth = state.checklistMod != null ? imageWidth - 104 : imageWidth - 50;
+        if (state.checklistMod != null) {
+            Checklist.Summary summary = Checklist.summary(state.checklistMod);
+            String text = RemoldText.tr("editor.checklist", summary.done(), summary.total()).getString();
+            g.drawString(font, font.plainSubstrByWidth(text, textWidth), 50, 5, 0xFF2E7D32, false);
+        } else if (state.fromSource()) {
+            String text = RemoldText.tr("editor.file", state.sourceName).getString();
+            g.drawString(font, font.plainSubstrByWidth(text, textWidth), 50, 5, 0xFF1565C0, false);
+        } else if (state.loadedFrom != null) {
             String editing = RemoldText.tr("editor.editing", state.loadedFrom.toString()).getString();
-            g.drawString(font, font.plainSubstrByWidth(editing, imageWidth - 50), 50, 5, 0xFF7A5C00, false);
+            g.drawString(font, font.plainSubstrByWidth(editing, textWidth), 50, 5, 0xFF7A5C00, false);
         }
         Machine machine = state.machine;
         if (machine.isTemplate() && machine.examples().size() > 1) {
@@ -345,14 +370,17 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
                 if (ghost.tag() != null) {
                     lines.add(RemoldText.tr("editor.slot.tag", "#" + ghost.tag().location()).withStyle(ChatFormatting.GOLD));
                 }
+                if (countable(slot.index())) {
+                    lines.add(RemoldText.tr("editor.slot.amount", ghost.stack().getCount()).withStyle(ChatFormatting.AQUA));
+                } else if (state.machine.isTemplate()) {
+                    lines.add(RemoldText.tr("editor.slot.single").withStyle(ChatFormatting.DARK_GRAY));
+                }
                 lines.add(RemoldText.tr("editor.slot.tag.hint").withStyle(ChatFormatting.DARK_GRAY));
                 lines.add(RemoldText.tr("editor.slot.clear").withStyle(ChatFormatting.DARK_GRAY));
             }
         }
         g.renderComponentTooltip(font, lines, mouseX, mouseY);
     }
-
-    // ------------------------------------------------------------------ input
 
     @Nullable
     private GhostSlot ghostAt(double mouseX, double mouseY) {
@@ -378,7 +406,7 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
         GhostSlot slot = ghostAt(mouseX, mouseY);
         if (button == 0 && slot != null && !slot.output() && !cursor.isEmpty()) {
-            setInput(slot.index(), GhostIngredient.of(cursor));
+            setInput(slot.index(), ghostFromCursor(slot.index()));
             return true;
         }
         if (button == 1 && slot != null && !slot.output()) {
@@ -391,6 +419,12 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
         GhostSlot slot = ghostAt(mouseX, mouseY);
+        if (slot != null && !slot.output() && countable(slot.index()) && !state.inputs[slot.index()].isEmpty()) {
+            ItemStack stack = state.inputs[slot.index()].stack();
+            int step = hasShiftDown() ? 10 : 1;
+            stack.setCount(Math.max(1, Math.min(9999, stack.getCount() + (scrollY > 0 ? step : -step))));
+            return true;
+        }
         if (slot != null && slot.output()) {
             ItemStack stack = state.outputs[slot.index()];
             if (!stack.isEmpty()) {
@@ -400,6 +434,19 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+    }
+
+    private void addSlot(boolean output) {
+        if (RecipeFactory.addTemplateSlot(state, output, registries())) rebuildWidgets();
+    }
+
+    private boolean countable(int input) {
+        return state.machine.isTemplate() && state.template != null && input < state.template.inputs.size()
+                && state.template.inputs.get(input).countable();
+    }
+
+    private GhostIngredient ghostFromCursor(int input) {
+        return countable(input) ? new GhostIngredient(cursor.copy(), null) : GhostIngredient.of(cursor);
     }
 
     private void clickGhost(GhostSlot slot, int button) {
@@ -421,10 +468,10 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
         if (button == 1 || (button == 0 && hasShiftDown())) {
             setInput(slot.index(), GhostIngredient.EMPTY);
         } else if (tagClick) {
-            if (current.isEmpty() && !cursor.isEmpty()) current = GhostIngredient.of(cursor);
+            if (current.isEmpty() && !cursor.isEmpty()) current = ghostFromCursor(slot.index());
             setInput(slot.index(), current.cycleTag());
         } else if (!cursor.isEmpty()) {
-            setInput(slot.index(), GhostIngredient.of(cursor));
+            setInput(slot.index(), ghostFromCursor(slot.index()));
         } else if (!current.isEmpty()) {
             cursor = current.stack().copy();
             setInput(slot.index(), GhostIngredient.EMPTY);
@@ -452,7 +499,6 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
 
     @Override
     protected void slotClicked(@Nullable Slot slot, int slotId, int button, ClickType type) {
-        // Never forwarded to the server: inventory slots only hand out ghost copies.
         if (slot == null) {
             cursor = ItemStack.EMPTY;
             return;
@@ -483,18 +529,23 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
         }
         if (getFocused() instanceof EditBox box && box.isFocused() && keyCode != InputConstants.KEY_TAB) {
             box.keyPressed(keyCode, scanCode, modifiers);
-            return true; // don't let typing "e" close the screen
+            return true;
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     @Override
     public void onClose() {
-        // Not super.onClose(): that would tell the server to close a container it never opened.
-        minecraft.setScreen(parent);
+        Screen target = returnTo != null ? returnTo : parent;
+        returnTo = null;
+        minecraft.setScreen(target);
     }
 
-    // ------------------------------------------------------------------ actions
+    @Nullable private Screen returnTo;
+
+    public void returnTo(@Nullable Screen screen) {
+        returnTo = screen;
+    }
 
     private void switchExample(int delta) {
         RecipeFactory.loadExample(state, state.exampleIndex + delta, registries());
@@ -524,7 +575,6 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
         }
     }
 
-    /** Duplication loops, and items that stop being craftable when this replaces an existing recipe. */
     private List<Component> progressionWarnings(ResourceLocation recipeId, JsonObject json) {
         var parsed = net.minecraft.world.item.crafting.Recipe.CODEC.parse(
                 registries().createSerializationContext(com.mojang.serialization.JsonOps.INSTANCE), json).result();
@@ -534,8 +584,7 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
         if (recipes().byKey(recipeId).isPresent()) {
             List<net.minecraft.world.item.crafting.Recipe<?>> after = ProgressionCheck.without(all, java.util.Set.of(recipeId));
             after.add(parsed.get());
-            warnings.addAll(ProgressionCheck.describeLost(ProgressionCheck.lostItems(
-                    all.stream().<net.minecraft.world.item.crafting.Recipe<?>>map(RecipeHolder::value).toList(), after, java.util.Set.of(), registries()), 12));
+            warnings.addAll(ProgressionCheck.describeLost(ProgressionCheck.lostItemsFrom(all, after, java.util.Set.of(), registries()), 12));
         }
         return warnings;
     }
@@ -549,7 +598,6 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
         minecraft.setScreen(new ConflictScreen(this, conflicts,
                 () -> send(recipeId, recipeJson, apply),
                 () -> {
-                    // Removals are queued (no reload) so everything is applied once, together with the save.
                     for (ResourceLocation other : conflicts) {
                         Services.PLATFORM.sendToServer(new Payloads.RecipeAction(Payloads.Action.REMOVE, other, false));
                     }
@@ -558,7 +606,17 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
     }
 
     private void send(ResourceLocation id, String json, boolean apply) {
+        if (state.fromSource()) {
+            Services.PLATFORM.sendToServer(new Payloads.SourceSave(state.sourceKey, state.sourceIndex, json, apply));
+            dev.remold.client.Progress.setDone(dev.remold.client.Progress.fileKey(state.sourceKey, id.toString()), true);
+            state.markClean();
+            return;
+        }
         Services.PLATFORM.sendToServer(new Payloads.SaveRecipe(id, json, apply));
+        if (state.checklistMod != null && !state.output().isEmpty()) {
+            dev.remold.client.Progress.setDone(dev.remold.client.Progress.itemKey(
+                    net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(state.output().getItem()).toString()), true);
+        }
         state.loadedFrom = id;
         state.recipeId = id.toString();
         state.autoId = false;
@@ -570,15 +628,8 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
         state.markClean();
     }
 
-    // ------------------------------------------------------------------ unsaved changes
-
     @Nullable private Runnable pendingReplace;
 
-    /**
-     * Runs an action that replaces the draft (load, clear). If the draft has unsaved changes, asks first.
-     * The question is shown the next time this screen ticks, because loads often come from other screens
-     * (the recipe browser, JEI) that switch back to the editor right after.
-     */
     private void replaceDraft(Runnable action) {
         if (!state.isDirty()) {
             action.run();
@@ -626,18 +677,61 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
         minecraft.setScreen(new RecipeBrowserScreen(this, output.isEmpty() ? "" : output.getHoverName().getString()));
     }
 
-    /** Loads an existing recipe into the editor (from the browser or a recipe viewer). */
-    public void load(RecipeHolder<?> holder) {
+    public void loadFromSource(String key, int index, String name, ResourceLocation id, com.google.gson.JsonObject json) {
+        var parsed = net.minecraft.world.item.crafting.Recipe.CODEC.parse(
+                registries().createSerializationContext(com.mojang.serialization.JsonOps.INSTANCE), json);
+        if (parsed.error().isPresent()) {
+            RemoldClient.toast(false, RemoldText.tr("files.cant_open"), RemoldText.tr("files.cant_open.message"));
+            return;
+        }
+        dev.remold.core.TemplateCache.preload(id, json);
+        RecipeHolder<?> holder = new RecipeHolder<>(id, parsed.getOrThrow());
         replaceDraft(() -> {
             RecipeFactory.load(state, holder, recipes(), registries());
+            state.sourceKey = key;
+            state.sourceIndex = index;
+            state.sourceName = name;
+            state.checklistMod = null;
             cursor = ItemStack.EMPTY;
             selectedOutput = 0;
             state.markClean();
-            if (minecraft.screen == this) rebuildWidgets();
+            if (showing()) rebuildWidgets();
         });
     }
 
-    /** Called when a template requested from the server arrives. */
+    public void startChecklistItem(String mod, net.minecraft.world.item.Item item) {
+        replaceDraft(() -> {
+            RecipeHolder<?> existing = Checklist.remoldRecipeFor(item);
+            if (existing != null) {
+                RecipeFactory.load(state, existing, recipes(), registries());
+            } else {
+                Machine machine = state.machine;
+                state.clear();
+                if (machine.isTemplate()) RecipeFactory.setMachine(state, Machines.SHAPED, registries());
+                state.outputs[0] = new ItemStack(item);
+                updateAutoId();
+            }
+            state.forgetSource();
+            state.checklistMod = mod;
+            cursor = ItemStack.EMPTY;
+            selectedOutput = 0;
+            state.markClean();
+            if (showing()) rebuildWidgets();
+        });
+    }
+
+    public void load(RecipeHolder<?> holder) {
+        replaceDraft(() -> {
+            RecipeFactory.load(state, holder, recipes(), registries());
+            state.forgetSource();
+            state.checklistMod = null;
+            cursor = ItemStack.EMPTY;
+            selectedOutput = 0;
+            state.markClean();
+            if (showing()) rebuildWidgets();
+        });
+    }
+
     public void onTemplateReceived(ResourceLocation id) {
         Machine machine = state.machine;
         if (machine.isTemplate() && state.template == null && !machine.examples().isEmpty()
@@ -649,29 +743,21 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
         }
     }
 
-    /**
-     * For recipe viewers' "+" buttons: loads the recipe with this id if it exists, otherwise the loose items
-     * (for displays that aren't real recipes, like anvil or brewing).
-     */
     public void loadFromViewer(@Nullable ResourceLocation recipeId, List<ItemStack> inputs, ItemStack output) {
         var holder = recipeId == null ? java.util.Optional.<RecipeHolder<?>>empty() : recipes().byKey(recipeId);
         if (holder.isPresent()) load(holder.get());
         else loadItems(inputs, output, false);
     }
 
-    /** Loads loose items when a recipe viewer shows something that isn't a real recipe. */
     public void loadItems(List<ItemStack> inputs, ItemStack output, boolean shaped) {
         replaceDraft(() -> {
             RecipeFactory.loadItems(state, inputs, output, shaped, registries());
             updateAutoId();
             state.markClean();
-            if (minecraft.screen == this) rebuildWidgets();
+            if (showing()) rebuildWidgets();
         });
     }
 
-    // ------------------------------------------------------------------ recipe viewer support
-
-    /** Slots that recipe viewers (JEI, EMI, ...) can drop items onto. */
     public List<DropTarget> dropTargets() {
         List<DropTarget> targets = new ArrayList<>();
         if (state.machine.isTemplate() && state.template == null) return targets;
@@ -688,7 +774,6 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
         return targets;
     }
 
-    /** The item shown in the ghost slot under the mouse, so viewers can show its recipes (R / U keys). */
     public ItemStack ghostStackAt(double mouseX, double mouseY) {
         GhostSlot s = ghostAt(mouseX, mouseY);
         if (s == null) return ItemStack.EMPTY;
@@ -701,7 +786,6 @@ public class EditorScreen extends AbstractContainerScreen<EditorMenu> {
         return s == null ? null : new Rect2i(leftPos + s.x(), topPos + s.y(), s.size(), s.size());
     }
 
-    /** Lets a viewer's item list be used as a palette: clicking an item there picks up a ghost copy. */
     public void pickUp(ItemStack stack) {
         cursor = stack.copy();
     }

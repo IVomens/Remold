@@ -38,14 +38,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * Turns editor state into real recipes (and back). Vanilla recipes are built as real recipe objects
- * and encoded with the game's own codec, so the JSON is always exactly what the game expects.
- */
 public final class RecipeFactory {
     private RecipeFactory() {}
-
-    // ------------------------------------------------------------------ machine switching
 
     public static void setMachine(EditorState state, Machine machine, HolderLookup.Provider registries) {
         Machine previous = state.machine;
@@ -59,7 +53,7 @@ public final class RecipeFactory {
         state.params = new String[0];
         GhostIngredient[] old = state.inputs;
         state.inputs = EditorState.empty(machine.kind().inputs);
-        // Keep what can be kept: grid -> grid keeps everything, otherwise keep the first input.
+
         if (previous.kind().grid && machine.kind().grid) {
             state.inputs = Arrays.copyOf(old, 9);
         } else if (old.length > 0) {
@@ -106,7 +100,23 @@ public final class RecipeFactory {
         state.params = template.params.stream().map(p -> p.original().getAsString()).toArray(String[]::new);
     }
 
-    // ------------------------------------------------------------------ building
+    public static boolean addTemplateSlot(EditorState state, boolean output, HolderLookup.Provider registries) {
+        TemplateRecipe old = state.template;
+        if (old == null || !old.canAdd(output)) return false;
+        TemplateRecipe next = old.withExtraSlot(output);
+        if (next == old) return false;
+        java.util.Map<List<Object>, GhostIngredient> inputs = new java.util.HashMap<>();
+        for (int i = 0; i < old.inputs.size(); i++) inputs.put(old.inputs.get(i).path(), state.inputs[i]);
+        java.util.Map<List<Object>, ItemStack> outputs = new java.util.HashMap<>();
+        for (int i = 0; i < old.outputs.size(); i++) outputs.put(old.outputs.get(i).path(), state.outputs[i]);
+        java.util.Map<List<Object>, String> params = new java.util.HashMap<>();
+        for (int i = 0; i < old.params.size(); i++) params.put(old.params.get(i).path(), state.params[i]);
+        state.template = next;
+        state.inputs = next.inputs.stream().map(n -> inputs.getOrDefault(n.path(), GhostIngredient.EMPTY)).toArray(GhostIngredient[]::new);
+        state.outputs = next.outputs.stream().map(n -> outputs.getOrDefault(n.path(), ItemStack.EMPTY)).toArray(ItemStack[]::new);
+        state.params = next.params.stream().map(p -> params.getOrDefault(p.path(), p.original().getAsString())).toArray(String[]::new);
+        return true;
+    }
 
     public static DataResult<JsonObject> build(EditorState state, HolderLookup.Provider registries) {
         Machine.Kind kind = state.machine.kind();
@@ -185,7 +195,6 @@ public final class RecipeFactory {
         return new ShapedRecipe(state.group, CraftingBookCategory.MISC, ShapedRecipePattern.of(key, pattern), output.copy());
     }
 
-    /** Round-trips the JSON through the recipe codec, catching anything the target machine would reject. */
     private static DataResult<JsonObject> validate(JsonObject json, HolderLookup.Provider registries) {
         DataResult<Recipe<?>> parsed = Recipe.CODEC.parse(registries.createSerializationContext(JsonOps.INSTANCE), json);
         return parsed.error().isPresent()
@@ -193,9 +202,6 @@ public final class RecipeFactory {
                 : DataResult.success(json);
     }
 
-    // ------------------------------------------------------------------ loading
-
-    /** Fills the editor from an existing recipe, so it can be tweaked and saved over the original. */
     public static void load(EditorState state, RecipeHolder<?> holder, RecipeManager recipes, RegistryAccess registries) {
         Machine machine = Machines.forRecipe(holder, recipes, registries);
         state.machine = machine;
@@ -225,7 +231,6 @@ public final class RecipeFactory {
                     state.inputs[i] = GhostIngredient.fromIngredient(ingredients.get(i), registries);
             }
             case SMITHING -> {
-                // SmithingTransformRecipe keeps its ingredients private; read them from its JSON form instead.
                 Recipe.CODEC.encodeStart(registries.createSerializationContext(JsonOps.INSTANCE), recipe).result().ifPresent(json -> {
                     String[] keys = {"template", "base", "addition"};
                     for (int i = 0; i < 3; i++) {
@@ -247,7 +252,6 @@ public final class RecipeFactory {
         }
     }
 
-    /** Loads loose items (e.g. from a recipe viewer's "+" button for a recipe Remold can't read directly). */
     public static void loadItems(EditorState state, List<ItemStack> inputs, ItemStack output, boolean shaped, HolderLookup.Provider registries) {
         setMachine(state, shaped ? Machines.SHAPED : Machines.SHAPELESS, registries);
         state.inputs = EditorState.empty(9);
@@ -257,9 +261,6 @@ public final class RecipeFactory {
         state.autoId = true;
     }
 
-    // ------------------------------------------------------------------ ids
-
-    /** {@code remold:<output item>} with a numeric suffix if needed. */
     public static String suggestId(EditorState state, RecipeManager recipes) {
         ItemStack output = state.output();
         if (output.isEmpty()) return "";
@@ -274,7 +275,6 @@ public final class RecipeFactory {
         return Remold.id(candidate).toString();
     }
 
-    /** Parses what the operator typed. Ids without a namespace go in {@code remold:}. */
     public static DataResult<ResourceLocation> parseId(String text) {
         String t = text.trim().toLowerCase(Locale.ROOT);
         if (t.isEmpty()) return DataResult.error(() -> RemoldText.error("no_id"));

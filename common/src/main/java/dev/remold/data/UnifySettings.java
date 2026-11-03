@@ -10,14 +10,6 @@ import net.minecraft.resources.ResourceLocation;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Item unification: for each tag (e.g. {@code c:ingots/copper}), the one item every recipe should make.
- *
- * @param groups    tag → preferred item
- * @param hide      hide the other items from recipe viewers
- * @param convert   turn the other items into the preferred one in players' inventories
- * @param tagInputs make recipes that ask for one specific variant accept the whole tag
- */
 public record UnifySettings(Map<ResourceLocation, ResourceLocation> groups, boolean hide, boolean convert, boolean tagInputs) {
     public static final UnifySettings EMPTY = new UnifySettings(Map.of(), true, false, true);
 

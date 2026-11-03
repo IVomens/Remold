@@ -12,7 +12,6 @@ import net.minecraft.util.FormattedCharSequence;
 
 import java.util.List;
 
-/** Shown before saving a recipe that uses the same items as existing recipes. */
 public class ConflictScreen extends Screen {
     private static final int MAX_SHOWN = 6;
 

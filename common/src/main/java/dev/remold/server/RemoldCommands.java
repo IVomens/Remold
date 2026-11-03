@@ -16,21 +16,9 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.commands.arguments.EntityArgument;
 import com.mojang.brigadier.arguments.StringArgumentType;
 
-/**
- * <pre>
- * /remold          open the editor
- * /remold apply    reload datapacks so saved changes take effect (and re-read config/remold/remold.json)
- * /remold undo     undo the most recent change
- * /remold stage grant|revoke &lt;players&gt; &lt;stage&gt;   unlock recipes locked behind "stage:&lt;stage&gt;"
- * /remold stage list &lt;player&gt;
- * /remold list     list every change made with Remold
- * /remold export   export a shareable datapack zip + KubeJS script
- * </pre>
- */
 public final class RemoldCommands {
     private RemoldCommands() {}
 
-    /** Command output is translated; the English fallback covers consoles without Remold's language files. */
     private static MutableComponent msg(String key, String fallback, Object... args) {
         return Component.translatableWithFallback("remold.command." + key, fallback, args);
     }

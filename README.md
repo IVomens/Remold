@@ -23,7 +23,11 @@ press **Save**. That's it.
 
 | | |
 |---|---|
-| **In-game recipe editor** | An inventory button (operators only) opens a crafting GUI with "ghost" slots: nothing is taken from your inventory. |
+| **Simple home screen** | An inventory button (operators only) opens big picture buttons with plain words: *Make a recipe*, *Find recipes*, *My checklist*, *Edit files* and more. |
+| **In-game recipe editor** | A crafting GUI with "ghost" slots: nothing is taken from your inventory. |
+| **Edit KubeJS scripts and datapacks** | **Edit files** lists the scripts in `kubejs/server_scripts` and the world's datapacks. Pick one, see its recipes as items, click one to open it in the editor, and Save writes the change back into that same file (only that recipe changes; the rest of the script, including comments, is left alone). A *Done* view shows what you've already changed. Anything Remold can't safely edit, like code with variables, is shown but greyed out. |
+| **Checklist** | **My checklist** shows every item of a mod with a tick on the ones that have a recipe. Click an item to make its recipe, press *Next* to jump to the next one, or mark items as skipped. Great for doing a whole mod in one go. |
+| **Item amounts** | Machines that take more than one of an item in a slot (for example 16 steel plates) show the amount on the slot; scroll over it to change it. |
 | **Every vanilla station** | Shaped and shapeless crafting, furnace, blast furnace, smoker, campfire, stonecutter, smithing table. |
 | **Any modded machine** | Pick any recipe type from any installed mod. Remold starts from one of that machine's real recipes and lets you swap the items and change the values (time, energy, chance, fluids...). No per-mod code needed. |
 | **Edit or remove existing recipes** | Search all recipes, then **Edit** (save with the same id to replace it), **Remove**, or **Restore** the original. |
@@ -56,7 +60,8 @@ press **Save**. That's it.
    ```
    Changes take effect on `/remold apply` or a restart.
 2. Open your inventory and click the small **crafting table** button in the top-right.
-   (Or run `/remold`, or bind *Open recipe editor* in Controls.)
+   (Or run `/remold`, or bind *Open recipe editor* in Controls.) This opens the home screen;
+   choose **Make a recipe**.
 3. Click **the machine bar** to choose a crafting table, a furnace, or any modded machine.
 4. Put items in the slots:
    - click an item in your inventory to pick up a ghost copy, then click slots (hold to paint);

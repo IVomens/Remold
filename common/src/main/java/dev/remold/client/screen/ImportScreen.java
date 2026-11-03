@@ -19,10 +19,6 @@ import org.jetbrains.annotations.Nullable;
 import java.io.File;
 import java.util.List;
 
-/**
- * Import shared Remold packs (files made with {@code /remold export}, or datapack zips) from the
- * server's {@code remold-imports} folder.
- */
 public class ImportScreen extends Screen {
     private final Screen parent;
     private List<Payloads.ImportSummary> files = List.of();
@@ -50,7 +46,7 @@ public class ImportScreen extends Screen {
         addRenderableWidget(Button.builder(RemoldText.tr("import.refresh"), b -> request()).bounds(x + 81, y, 78, 20).build());
         Button open = addRenderableWidget(Button.builder(RemoldText.tr("import.open"), b -> Util.getPlatform().openFile(new File(folder)))
                 .bounds(x + 162, y, 78, 20).build());
-        // The folder is on the server's machine, so it can only be opened in singleplayer.
+
         open.active = minecraft.hasSingleplayerServer() && !folder.isEmpty();
         addRenderableWidget(Button.builder(CommonComponents.GUI_BACK, b -> onClose()).bounds(x + 243, y, 78, 20).build());
         list.set(files);
@@ -62,7 +58,6 @@ public class ImportScreen extends Screen {
         Services.PLATFORM.sendToServer(new Payloads.ImportRequest("", false));
     }
 
-    /** Called when the server sends the folder contents. */
     public void receive(Payloads.ImportList payload) {
         files = payload.files();
         folder = payload.folder();

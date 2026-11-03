@@ -15,10 +15,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * All of Remold's network payloads. They only use vanilla classes, so every loader can register
- * them with its own networking API (see {@code RemoldNeoForge}).
- */
 public final class Payloads {
     private Payloads() {}
 
@@ -26,9 +22,6 @@ public final class Payloads {
         return new CustomPacketPayload.Type<>(Remold.id(name));
     }
 
-    // ---------------------------------------------------------------- client -> server
-
-    /** Save (create or replace) a recipe. {@code json} is a complete recipe JSON object. */
     public record SaveRecipe(ResourceLocation id, String json, boolean apply) implements CustomPacketPayload {
         public static final Type<SaveRecipe> TYPE = Payloads.typeOf("save_recipe");
         public static final StreamCodec<ByteBuf, SaveRecipe> CODEC = StreamCodec.composite(
@@ -44,17 +37,16 @@ public final class Payloads {
     }
 
     public enum Action {
-        /** Disable an existing recipe. */
         REMOVE,
-        /** Undo whatever Remold did to this recipe id. */
+
         REVERT,
-        /** Reload datapacks so queued changes take effect. Id is ignored. */
+
         APPLY,
-        /** Ask the server for the current change list. Id is ignored. */
+
         SYNC,
-        /** Remove every recipe that produces the item with this id. */
+
         REMOVE_ALL_FOR_ITEM,
-        /** Undo the most recent change. Id is ignored. */
+
         UNDO
     }
 
@@ -76,7 +68,6 @@ public final class Payloads {
         }
     }
 
-    /** Set (or clear, when empty) the annotation of an item. */
     public record SetAnnotation(ResourceLocation item, Annotation annotation) implements CustomPacketPayload {
         public static final Type<SetAnnotation> TYPE = Payloads.typeOf("set_annotation");
         public static final StreamCodec<ByteBuf, SetAnnotation> CODEC = StreamCodec.composite(
@@ -90,7 +81,6 @@ public final class Payloads {
         }
     }
 
-    /** Replace Remold's edits of one item tag (the full set of additions and removals). */
     public record SetTag(ResourceLocation tag, TagEdit edit, boolean apply) implements CustomPacketPayload {
         public static final Type<SetTag> TYPE = Payloads.typeOf("set_tag");
         public static final StreamCodec<ByteBuf, SetTag> CODEC = StreamCodec.composite(
@@ -106,15 +96,13 @@ public final class Payloads {
     }
 
     public enum BulkKind {
-        /** Replace item {@code a} with item {@code b}. Scope: 0 inputs and outputs, 1 inputs, 2 outputs. */
         REPLACE_ITEM,
-        /** Remove every recipe that uses item {@code a} as an ingredient (tags included). */
+
         REMOVE_USING_ITEM,
-        /** Remove every recipe from mod {@code a}. Scope: 0 by recipe id, 1 by the output item's mod. */
+
         REMOVE_FROM_MOD
     }
 
-    /** One action applied to many recipes at once; undone as a single step. */
     public record Bulk(BulkKind kind, String a, String b, int scope, boolean apply) implements CustomPacketPayload {
         public static final Type<Bulk> TYPE = Payloads.typeOf("bulk");
         public static final StreamCodec<ByteBuf, Bulk> CODEC = StreamCodec.composite(
@@ -131,7 +119,6 @@ public final class Payloads {
         }
     }
 
-    /** List the packs in the import folder (file empty), or import one. */
     public record ImportRequest(String file, boolean apply) implements CustomPacketPayload {
         public static final Type<ImportRequest> TYPE = Payloads.typeOf("import_request");
         public static final StreamCodec<ByteBuf, ImportRequest> CODEC = StreamCodec.composite(
@@ -145,7 +132,6 @@ public final class Payloads {
         }
     }
 
-    /** Unify items: for each tag in the settings, make every recipe produce the preferred item. */
     public record Unify(UnifySettings settings, boolean apply) implements CustomPacketPayload {
         public static final Type<Unify> TYPE = Payloads.typeOf("unify");
         public static final StreamCodec<ByteBuf, Unify> CODEC = StreamCodec.composite(
@@ -159,7 +145,6 @@ public final class Payloads {
         }
     }
 
-    /** Lock recipes (value: advancement id or "stage:name") or unlock them (empty value). */
     public record SetGates(Map<ResourceLocation, String> gates) implements CustomPacketPayload {
         public static final Type<SetGates> TYPE = Payloads.typeOf("set_gates");
         public static final StreamCodec<ByteBuf, SetGates> CODEC = ByteBufCodecs
@@ -172,7 +157,91 @@ public final class Payloads {
         }
     }
 
-    /** Ask the server for a recipe's original JSON, to use as a template for a machine. */
+    public record SourceRequest(String key, int index) implements CustomPacketPayload {
+        public static final Type<SourceRequest> TYPE = Payloads.typeOf("source_request");
+        public static final StreamCodec<ByteBuf, SourceRequest> CODEC = StreamCodec.composite(
+                ByteBufCodecs.STRING_UTF8, SourceRequest::key,
+                ByteBufCodecs.VAR_INT, SourceRequest::index,
+                SourceRequest::new);
+
+        @Override
+        public Type<SourceRequest> type() {
+            return TYPE;
+        }
+    }
+
+    public record SourceSave(String key, int index, String json, boolean apply) implements CustomPacketPayload {
+        public static final Type<SourceSave> TYPE = Payloads.typeOf("source_save");
+        public static final StreamCodec<ByteBuf, SourceSave> CODEC = StreamCodec.composite(
+                ByteBufCodecs.STRING_UTF8, SourceSave::key,
+                ByteBufCodecs.VAR_INT, SourceSave::index,
+                ByteBufCodecs.stringUtf8(1 << 20), SourceSave::json,
+                ByteBufCodecs.BOOL, SourceSave::apply,
+                SourceSave::new);
+
+        @Override
+        public Type<SourceSave> type() {
+            return TYPE;
+        }
+    }
+
+    public record SourceInfo(String key, String kind, String name, int recipes) {
+        public static final StreamCodec<ByteBuf, SourceInfo> CODEC = StreamCodec.composite(
+                ByteBufCodecs.STRING_UTF8, SourceInfo::key,
+                ByteBufCodecs.STRING_UTF8, SourceInfo::kind,
+                ByteBufCodecs.STRING_UTF8, SourceInfo::name,
+                ByteBufCodecs.VAR_INT, SourceInfo::recipes,
+                SourceInfo::new);
+    }
+
+    public record SourceList(List<SourceInfo> files) implements CustomPacketPayload {
+        public static final Type<SourceList> TYPE = Payloads.typeOf("source_list");
+        public static final StreamCodec<ByteBuf, SourceList> CODEC = SourceInfo.CODEC.apply(ByteBufCodecs.list())
+                .map(SourceList::new, SourceList::files);
+
+        @Override
+        public Type<SourceList> type() {
+            return TYPE;
+        }
+    }
+
+    public record SourceEntry(int index, String id, String output, String problem) {
+        public static final StreamCodec<ByteBuf, SourceEntry> CODEC = StreamCodec.composite(
+                ByteBufCodecs.VAR_INT, SourceEntry::index,
+                ByteBufCodecs.STRING_UTF8, SourceEntry::id,
+                ByteBufCodecs.STRING_UTF8, SourceEntry::output,
+                ByteBufCodecs.STRING_UTF8, SourceEntry::problem,
+                SourceEntry::new);
+    }
+
+    public record SourceEntries(String key, List<SourceEntry> entries) implements CustomPacketPayload {
+        public static final Type<SourceEntries> TYPE = Payloads.typeOf("source_entries");
+        public static final StreamCodec<ByteBuf, SourceEntries> CODEC = StreamCodec.composite(
+                ByteBufCodecs.STRING_UTF8, SourceEntries::key,
+                SourceEntry.CODEC.apply(ByteBufCodecs.list()), SourceEntries::entries,
+                SourceEntries::new);
+
+        @Override
+        public Type<SourceEntries> type() {
+            return TYPE;
+        }
+    }
+
+    public record SourceRecipe(String key, int index, String id, String json) implements CustomPacketPayload {
+        public static final Type<SourceRecipe> TYPE = Payloads.typeOf("source_recipe");
+        public static final StreamCodec<ByteBuf, SourceRecipe> CODEC = StreamCodec.composite(
+                ByteBufCodecs.STRING_UTF8, SourceRecipe::key,
+                ByteBufCodecs.VAR_INT, SourceRecipe::index,
+                ByteBufCodecs.STRING_UTF8, SourceRecipe::id,
+                ByteBufCodecs.stringUtf8(1 << 20), SourceRecipe::json,
+                SourceRecipe::new);
+
+        @Override
+        public Type<SourceRecipe> type() {
+            return TYPE;
+        }
+    }
+
     public record RequestTemplate(ResourceLocation id) implements CustomPacketPayload {
         public static final Type<RequestTemplate> TYPE = Payloads.typeOf("request_template");
         public static final StreamCodec<ByteBuf, RequestTemplate> CODEC = ResourceLocation.STREAM_CODEC.map(RequestTemplate::new, RequestTemplate::id);
@@ -183,12 +252,6 @@ public final class Payloads {
         }
     }
 
-    // ---------------------------------------------------------------- server -> client
-
-    /**
-     * A recipe as JSON, encoded on the server. Recipes on the client are network copies that have
-     * lost details (tags are expanded, shaped patterns lose their keys), so templates come from here.
-     */
     public record TemplateJson(ResourceLocation id, String json, String error) implements CustomPacketPayload {
         public static final Type<TemplateJson> TYPE = Payloads.typeOf("template_json");
         public static final StreamCodec<ByteBuf, TemplateJson> CODEC = StreamCodec.composite(
@@ -245,7 +308,6 @@ public final class Payloads {
         }
     }
 
-    /** Who may edit on this server, so the client knows whether to show the inventory button. */
     public record Access(int permissionLevel, boolean listed) implements CustomPacketPayload {
         public static final Type<Access> TYPE = Payloads.typeOf("access");
         public static final StreamCodec<ByteBuf, Access> CODEC = StreamCodec.composite(
@@ -259,7 +321,6 @@ public final class Payloads {
         }
     }
 
-    /** One pack in the import folder. {@code error} is empty when it could be read. */
     public record ImportSummary(String file, int recipes, int removals, int tags, int annotations, String error) {
         public static final StreamCodec<ByteBuf, ImportSummary> CODEC = StreamCodec.composite(
                 ByteBufCodecs.STRING_UTF8, ImportSummary::file,
@@ -284,7 +345,6 @@ public final class Payloads {
         }
     }
 
-    /** All recipe locks, and which requirements this player has met. Sent to every player. */
     public record SyncGates(Map<ResourceLocation, String> gates, java.util.Set<String> unlocked) implements CustomPacketPayload {
         public static final Type<SyncGates> TYPE = Payloads.typeOf("sync_gates");
         public static final StreamCodec<ByteBuf, SyncGates> CODEC = StreamCodec.composite(
@@ -298,7 +358,6 @@ public final class Payloads {
         }
     }
 
-    /** Feedback for the operator, shown as a toast. Title and message are translation keys. */
     public record Notice(boolean success, String title, String message, List<String> args) implements CustomPacketPayload {
         public static final Type<Notice> TYPE = Payloads.typeOf("notice");
         public static final StreamCodec<ByteBuf, Notice> CODEC = StreamCodec.composite(

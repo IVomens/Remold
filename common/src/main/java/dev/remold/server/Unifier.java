@@ -32,15 +32,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * One-click item unification: when several mods add the same material (five copper ingots, all in
- * {@code #c:ingots/copper}), make every recipe produce one preferred item, let recipes accept any of
- * them, hide the others from recipe viewers and optionally convert them in inventories.
- */
 public final class Unifier {
     private Unifier() {}
 
-    /** Other item → preferred item, for inventory conversion. Rebuilt after reloads and changes. */
     private static Map<Item, Item> conversions;
     private static MinecraftServer conversionsFor;
 
@@ -61,7 +55,6 @@ public final class Unifier {
         RegistryOps<JsonElement> ops = server.registryAccess().createSerializationContext(JsonOps.INSTANCE);
         UnifySettings settings = payload.settings();
 
-        // Settings for groups not sent this time are kept, so unification can be done a few groups at a time.
         Map<ResourceLocation, ResourceLocation> groups = new LinkedHashMap<>(pack.unify().groups());
         groups.putAll(settings.groups());
         UnifySettings stored = new UnifySettings(groups, settings.hide(), settings.convert(), settings.tagInputs());
@@ -69,10 +62,13 @@ public final class Unifier {
         int recipes = 0;
         try {
             pack.beginBatch(player.getGameProfile().getName());
-            // Work on the current JSON of each recipe, so several groups can change the same recipe.
+
             Map<ResourceLocation, JsonObject> changed = new LinkedHashMap<>();
             Map<ResourceLocation, JsonObject> current = new HashMap<>();
+            Set<Item> involved = new HashSet<>();
+            for (ResourceLocation tag : settings.groups().keySet()) involved.addAll(members(server, tag));
             for (RecipeHolder<?> h : server.getRecipeManager().getRecipes()) {
+                if (!dev.remold.core.RecipeUsage.mayInvolve(h.value(), involved, server.registryAccess())) continue;
                 Recipe.CODEC.encodeStart(ops, h.value()).result().filter(JsonElement::isJsonObject)
                         .ifPresent(json -> current.put(h.id(), json.getAsJsonObject()));
             }
@@ -140,7 +136,6 @@ public final class Unifier {
         ServerActions.finish(player, payload.apply(), "unified", Integer.toString(settings.groups().size()), Integer.toString(recipes));
     }
 
-    /** Clears the conversion cache (after reloads, undo, ...). */
     public static void invalidate() {
         conversions = null;
     }
@@ -163,7 +158,6 @@ public final class Unifier {
         return conversions;
     }
 
-    /** Call every server tick. Every second, swaps unified-away items in players' inventories. */
     public static void tick(MinecraftServer server) {
         if (server.getTickCount() % 20 != 0) return;
         Map<Item, Item> map = conversions(server);

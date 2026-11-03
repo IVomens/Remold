@@ -17,7 +17,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
 
-/** Pick a machine: vanilla workstations plus every recipe type registered by any mod. */
 public class MachineSelectScreen extends Screen {
     private final Screen parent;
     private final Consumer<Machine> onPick;

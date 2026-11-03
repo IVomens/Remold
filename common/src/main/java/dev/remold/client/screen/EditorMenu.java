@@ -8,16 +8,7 @@ import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
-/**
- * A client-only menu. It only exists so the editor is a normal container screen: that way JEI,
- * EMI and REI show their item panels next to it automatically, and the player's inventory can be
- * shown. Clicks never reach the server; inventory slots just copy their item as a "ghost".
- */
 public class EditorMenu extends AbstractContainerMenu {
-    /**
-     * Never registered (the menu only exists on the client, and registering it would stop vanilla clients
-     * from joining). It just gives recipe viewers that look handlers up by menu type, like EMI, a key.
-     */
     @SuppressWarnings("unchecked")
     public static final MenuType<EditorMenu> TYPE = (MenuType<EditorMenu>) dev.remold.platform.Services.PLATFORM.unregisteredMenuType();
 

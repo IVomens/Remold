@@ -16,13 +16,6 @@ import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-/**
- * Exports everything made with Remold, for sharing with other servers and modpacks:
- * <ul>
- *     <li>a zipped datapack (works on any loader, no Remold needed)</li>
- *     <li>an equivalent KubeJS server script, for packs that already manage recipes with KubeJS</li>
- * </ul>
- */
 public final class Exporter {
     private Exporter() {}
 
@@ -30,6 +23,7 @@ public final class Exporter {
 
     public static Result export(MinecraftServer server) throws IOException {
         RemoldPack pack = RemoldPack.get(server);
+        pack.flush();
         Path outDir = server.getServerDirectory().resolve("remold-exports");
         Files.createDirectories(outDir);
         String stamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));

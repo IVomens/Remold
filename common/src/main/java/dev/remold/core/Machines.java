@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-/** Finds every machine (recipe type) available in the current game. */
 public final class Machines {
     private Machines() {}
 
@@ -40,7 +39,6 @@ public final class Machines {
         return new Machine(ResourceLocation.withDefaultNamespace(type), kind, Component.literal(name), new ItemStack(icon), List.of());
     }
 
-    /** Built-in machines followed by every modded recipe type that has at least one recipe. */
     public static List<Machine> all(RecipeManager recipes, RegistryAccess registries) {
         List<Machine> result = new ArrayList<>(BUILTIN);
         Map<RecipeType<?>, List<RecipeHolder<?>>> byType = new LinkedHashMap<>();
@@ -82,7 +80,7 @@ public final class Machines {
     private static ItemStack icon(ResourceLocation typeId, List<RecipeHolder<?>> examples, RegistryAccess registries) {
         ItemStack fromViewer = ViewerBridge.catalyst(typeId);
         if (!fromViewer.isEmpty()) return fromViewer;
-        // Many mods name the machine block after its recipe type (e.g. "mod:crusher").
+
         var sameName = BuiltInRegistries.ITEM.getOptional(typeId);
         if (sameName.isPresent()) return new ItemStack(sameName.get());
         for (RecipeHolder<?> h : examples) {
@@ -92,7 +90,6 @@ public final class Machines {
         return new ItemStack(Items.BARREL);
     }
 
-    /** The machine to use to edit an existing recipe. */
     public static Machine forRecipe(RecipeHolder<?> holder, RecipeManager recipes, RegistryAccess registries) {
         RecipeSerializer<?> s = holder.value().getSerializer();
         if (s == RecipeSerializer.SHAPED_RECIPE) return SHAPED;

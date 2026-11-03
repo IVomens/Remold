@@ -7,17 +7,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
 
-/**
- * Loose coupling between Remold and recipe viewers (JEI, EMI, ...). Viewer plugins register hooks
- * here; Remold itself never references viewer classes, so every viewer stays optional.
- */
 public final class ViewerBridge {
     private static final List<Function<ResourceLocation, ItemStack>> CATALYSTS = new ArrayList<>();
     private static final List<Runnable> ANNOTATION_LISTENERS = new ArrayList<>();
 
     private ViewerBridge() {}
 
-    /** Register a lookup from recipe type id to the machine that crafts it (JEI "catalysts", EMI "workstations"). */
     public static void addCatalystLookup(Function<ResourceLocation, ItemStack> lookup) {
         CATALYSTS.add(lookup);
     }
@@ -28,13 +23,11 @@ public final class ViewerBridge {
                 ItemStack stack = lookup.apply(recipeType);
                 if (stack != null && !stack.isEmpty()) return stack;
             } catch (Exception ignored) {
-                // a broken viewer integration must never break the editor
             }
         }
         return ItemStack.EMPTY;
     }
 
-    /** Called when item annotations change, so viewers can hide/show items. */
     public static void onAnnotationsChanged(Runnable listener) {
         ANNOTATION_LISTENERS.add(listener);
     }

@@ -14,17 +14,12 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-/**
- * Template recipes fetched from the server. The server encodes its own copy of the recipe, which
- * still has everything the original JSON had (tags, shaped keys, ...), unlike the client's copy.
- */
 public final class TemplateCache {
     private static final Map<ResourceLocation, DataResult<TemplateRecipe>> CACHE = new HashMap<>();
     private static final Set<ResourceLocation> REQUESTED = new HashSet<>();
 
     private TemplateCache() {}
 
-    /** The template, or empty while it is being fetched (a request is sent the first time). */
     public static Optional<DataResult<TemplateRecipe>> get(ResourceLocation id) {
         DataResult<TemplateRecipe> cached = CACHE.get(id);
         if (cached != null) return Optional.of(cached);
@@ -48,7 +43,10 @@ public final class TemplateCache {
         }
     }
 
-    /** Recipes changed on the server: forget everything. */
+    public static void preload(ResourceLocation id, com.google.gson.JsonObject json) {
+        CACHE.put(id, DataResult.success(TemplateRecipe.of(id, json)));
+    }
+
     public static void clear() {
         CACHE.clear();
         REQUESTED.clear();

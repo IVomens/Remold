@@ -14,13 +14,6 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Finds existing recipes that the draft would clash with: same machine, and the same items put in
- * would match both. Minecraft then silently uses only one of them.
- * <p>
- * Tags are checked with their first item, so this catches the usual mistakes without being exhaustive.
- * Stonecutters and modded machines are skipped (a stonecutter is meant to offer several results).
- */
 public final class ConflictCheck {
     private ConflictCheck() {}
 

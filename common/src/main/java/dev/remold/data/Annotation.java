@@ -8,12 +8,6 @@ import net.minecraft.network.codec.StreamCodec;
 
 import java.util.List;
 
-/**
- * Extra information attached to an item by an operator, e.g. a red "ITEM UNOBTAINABLE" tooltip.
- *
- * @param lines            tooltip lines, using {@code &} colour codes (see {@link TextUtil})
- * @param hideFromViewers  whether recipe viewers (JEI, EMI, ...) should hide the item
- */
 public record Annotation(List<String> lines, boolean hideFromViewers) {
     public static final Annotation EMPTY = new Annotation(List.of(), false);
 

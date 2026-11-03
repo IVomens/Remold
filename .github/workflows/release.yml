@@ -1,12 +1,5 @@
 name: Release
 
-# Publish a release in either of two ways:
-#   - Actions tab > Release > Run workflow, and enter the version (e.g. 0.1.0-beta.1); the tag
-#     v<version> is created on the commit the workflow runs on
-#   - or push a version tag: git tag v0.1.0-beta.1 && git push origin v0.1.0-beta.1
-# Versions with a "-" (beta, alpha, rc) become pre-releases. Release notes are the matching
-# "## <version>" section of CHANGELOG.md.
-
 on:
   push:
     tags:
@@ -73,7 +66,6 @@ jobs:
         run: |
           flags=""
           if [ "$PRERELEASE" = "true" ]; then flags="--prerelease"; fi
-          # Creates the tag on this commit if it doesn't exist yet (manual runs).
           gh release create "$TAG" dist/*.jar $flags --target "$GITHUB_SHA" \
             --title "Remold $VERSION for Minecraft $MC" \
             --notes-file notes.md

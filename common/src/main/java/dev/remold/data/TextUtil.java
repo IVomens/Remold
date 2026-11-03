@@ -8,14 +8,9 @@ import net.minecraft.network.chat.TextColor;
 
 import java.util.Optional;
 
-/**
- * Converts between the friendly {@code &}-code format operators type (e.g. {@code &c&lITEM UNOBTAINABLE},
- * {@code &#ff8800Orange}) and real styled {@link Component}s.
- */
 public final class TextUtil {
     private TextUtil() {}
 
-    /** Parses {@code &} colour/format codes. Text starts non-italic (item names and lore default to italic). */
     public static MutableComponent parse(String input) {
         MutableComponent root = Component.empty();
         Style style = Style.EMPTY.withItalic(false);
@@ -44,7 +39,7 @@ public final class TextUtil {
                     i++;
                     continue;
                 }
-                if (code == '&') { // "&&" escapes a literal ampersand
+                if (code == '&') {
                     current.append('&');
                     i++;
                     continue;
@@ -71,7 +66,6 @@ public final class TextUtil {
         }
     }
 
-    /** Best effort inverse of {@link #parse}, used to pre-fill edit boxes from existing names and lore. */
     public static String toCodes(Component component) {
         StringBuilder out = new StringBuilder();
         component.visit((style, text) -> {

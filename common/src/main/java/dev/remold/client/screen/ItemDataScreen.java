@@ -25,10 +25,6 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.function.Consumer;
 
-/**
- * Edit the data of the recipe's output item without touching any JSON: custom name, lore lines
- * (e.g. a red "ITEM UNOBTAINABLE"), enchantment glint, rarity, unbreakable, model data and count.
- */
 public class ItemDataScreen extends Screen {
     private static final int LORE_LINES = 4;
 
@@ -43,7 +39,6 @@ public class ItemDataScreen extends Screen {
     private Toggle glint = Toggle.DEFAULT, unbreakable = Toggle.DEFAULT;
     private String rarity = "default";
 
-    // values kept across re-init (e.g. window resize)
     private String nameValue, countValue, modelValue;
     private final String[] loreValues = new String[LORE_LINES];
 

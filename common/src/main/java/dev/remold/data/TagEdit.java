@@ -8,10 +8,6 @@ import net.minecraft.network.codec.StreamCodec;
 
 import java.util.List;
 
-/**
- * Remold's changes to one item tag: entries added and entries removed. Entries are item ids, or
- * tag ids prefixed with {@code #}.
- */
 public record TagEdit(List<String> add, List<String> remove) {
     public static final TagEdit EMPTY = new TagEdit(List.of(), List.of());
 

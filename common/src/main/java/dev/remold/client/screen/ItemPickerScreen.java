@@ -23,10 +23,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
 
-/**
- * Search every item in the game, for players without a recipe viewer.
- * Type {@code @modid} to filter by mod, like in JEI.
- */
 public class ItemPickerScreen extends Screen {
     private static List<ItemStack> cache;
 
@@ -51,7 +47,6 @@ public class ItemPickerScreen extends Screen {
         if (cache == null) {
             List<ItemStack> list = new ArrayList<>();
             try {
-                // The creative search tab contains variants too (potions, enchanted books, painted items...).
                 CreativeModeTabs.tryRebuildTabContents(minecraft.player.connection.enabledFeatures(), true, minecraft.level.registryAccess());
                 list.addAll(CreativeModeTabs.searchTab().getDisplayItems());
             } catch (Exception ignored) {
@@ -105,7 +100,7 @@ public class ItemPickerScreen extends Screen {
             case RECENT -> stacksFor(PickerMemory.recent());
             case ALL -> {
                 if (!q.isEmpty() || modFilter != null) yield allItems();
-                // No search: favourites and recent items first, so they're one click away.
+
                 LinkedHashSet<Item> first = new LinkedHashSet<>();
                 stacksFor(PickerMemory.favourites()).forEach(s -> first.add(s.getItem()));
                 stacksFor(PickerMemory.recent()).forEach(s -> first.add(s.getItem()));

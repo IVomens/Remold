@@ -26,20 +26,20 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * The trick that makes Remold work with machines from any mod, without per-mod code.
- * <p>
- * Every recipe in 1.21 can be turned into JSON with its own codec. We take an existing recipe of
- * the chosen machine, encode it, and scan the JSON for anything that looks like an item
- * (ingredients: {@code {"item": ...}} / {@code {"tag": ...}}, stacks: {@code {"id": ..., "count": n}}).
- * Those become editor slots; every other number/string/boolean (processing time, energy, fluid
- * amounts, ...) becomes an editable parameter. Saving writes the edited copy back through the
- * same codec, so the mod itself validates the result.
- */
 public final class TemplateRecipe {
     public enum NodeStyle { INGREDIENT_ITEM, INGREDIENT_TAG, STACK_ID, STACK_ITEM, PLAIN_STRING }
 
-    public record Node(List<Object> path, NodeStyle style, boolean output) {}
+    public record Node(List<Object> path, NodeStyle style, boolean output, @org.jetbrains.annotations.Nullable List<Object> countPath) {
+        public Node(List<Object> path, NodeStyle style, boolean output) {
+            this(path, style, output, null);
+        }
+
+        public boolean countable() {
+            return countPath != null;
+        }
+    }
+
+    private static final List<String> COUNT_KEYS = List.of("count", "amount", "size", "stacksize", "stack_size", "quantity", "qty");
 
     public record Param(List<Object> path, JsonPrimitive original) {
         public String label() {
@@ -67,6 +67,7 @@ public final class TemplateRecipe {
         this.sourceId = sourceId;
         this.json = json;
         walk(json, new ArrayList<>(), false);
+        findCounts();
     }
 
     public static DataResult<TemplateRecipe> of(RecipeHolder<?> holder, HolderLookup.Provider registries) {
@@ -79,8 +80,6 @@ public final class TemplateRecipe {
     public static TemplateRecipe of(ResourceLocation id, JsonObject json) {
         return new TemplateRecipe(id, json);
     }
-
-    // ------------------------------------------------------------------ scanning
 
     private static boolean isItem(JsonElement e) {
         if (!e.isJsonPrimitive() || !e.getAsJsonPrimitive().isString()) return false;
@@ -169,16 +168,77 @@ public final class TemplateRecipe {
         return copy;
     }
 
-    // ------------------------------------------------------------------ reading values
+    @org.jetbrains.annotations.Nullable
+    public static List<Object> elementPath(List<Object> path) {
+        for (int i = path.size() - 1; i >= 0; i--) {
+            if (path.get(i) instanceof Integer) return new ArrayList<>(path.subList(0, i + 1));
+        }
+        return null;
+    }
+
+    public boolean canAdd(boolean output) {
+        for (Node node : output ? outputs : inputs) {
+            if (elementPath(node.path()) != null) return true;
+        }
+        return false;
+    }
+
+    public TemplateRecipe withExtraSlot(boolean output) {
+        List<Node> nodes = output ? outputs : inputs;
+        for (int i = nodes.size() - 1; i >= 0; i--) {
+            List<Object> element = elementPath(nodes.get(i).path());
+            if (element == null) continue;
+            JsonObject copy = json.deepCopy();
+            JsonElement array = get(copy, element.subList(0, element.size() - 1));
+            array.getAsJsonArray().add(get(copy, element).deepCopy());
+            return new TemplateRecipe(sourceId, copy);
+        }
+        return this;
+    }
+
+    private void findCounts() {
+        List<List<Object>> countPaths = new ArrayList<>();
+        for (int i = 0; i < inputs.size(); i++) {
+            Node node = inputs.get(i);
+            if (node.style() == NodeStyle.PLAIN_STRING || node.style() == NodeStyle.STACK_ID) continue;
+            List<Object> found = countPathFor(node.path());
+            if (found != null) {
+                inputs.set(i, new Node(node.path(), node.style(), false, found));
+                countPaths.add(found);
+            }
+        }
+        params.removeIf(p -> countPaths.contains(p.path()));
+    }
+
+    @org.jetbrains.annotations.Nullable
+    private List<Object> countPathFor(List<Object> path) {
+        List<Object> element = elementPath(path);
+        int stop = element != null ? element.size() : Math.max(1, path.size() - 1);
+        for (int end = path.size(); end >= stop; end--) {
+            List<Object> at = new ArrayList<>(path.subList(0, end));
+            JsonElement e = get(json, at);
+            if (!e.isJsonObject()) continue;
+            if (element == null && end < path.size() && e.getAsJsonObject().size() > 3) continue;
+            for (String key : e.getAsJsonObject().keySet()) {
+                if (COUNT_KEYS.contains(key.toLowerCase(java.util.Locale.ROOT)) && isNumber(e.getAsJsonObject().get(key))) return append(at, key);
+            }
+        }
+        return null;
+    }
+
+    private static boolean isNumber(@org.jetbrains.annotations.Nullable JsonElement e) {
+        return e != null && e.isJsonPrimitive() && e.getAsJsonPrimitive().isNumber();
+    }
 
     public GhostIngredient initialInput(Node node) {
         JsonElement e = get(json, node.path());
+        int count = node.countable() ? Math.max(1, get(json, node.countPath()).getAsInt()) : 1;
         if (node.style() == NodeStyle.INGREDIENT_TAG) {
             TagKey<Item> tag = TagKey.create(Registries.ITEM, ResourceLocation.parse(e.getAsJsonObject().get("tag").getAsString()));
             ItemStack first = GhostIngredient.tagItems(tag).stream().findFirst().map(ItemStack::new).orElse(new ItemStack(Items.BARRIER));
-            return new GhostIngredient(first, tag);
+            return new GhostIngredient(first.copyWithCount(count), tag);
         }
-        return GhostIngredient.of(stackOf(e, node.style()));
+        return new GhostIngredient(stackOf(e, node.style()).copyWithCount(count), null);
     }
 
     public ItemStack initialOutput(Node node, HolderLookup.Provider registries) {
@@ -204,18 +264,9 @@ public final class TemplateRecipe {
         return new ItemStack(BuiltInRegistries.ITEM.get(ResourceLocation.parse(id)), count);
     }
 
-    // ------------------------------------------------------------------ building
-
-    /**
-     * Builds a new recipe JSON from this template.
-     *
-     * @param inputs      one ghost per {@link #inputs} node; empty ghosts inside lists are removed
-     * @param outputs     one stack per {@link #outputs} node
-     * @param paramValues one string per {@link #params} entry
-     */
     public DataResult<JsonObject> build(GhostIngredient[] inputs, ItemStack[] outputs, String[] paramValues, HolderLookup.Provider registries) {
         JsonObject copy = json.deepCopy();
-        List<List<Object>> removals = new ArrayList<>();
+        java.util.LinkedHashSet<List<Object>> removals = new java.util.LinkedHashSet<>();
 
         for (int i = 0; i < this.params.size(); i++) {
             Param param = this.params.get(i);
@@ -238,8 +289,9 @@ public final class TemplateRecipe {
             Node node = this.inputs.get(i);
             GhostIngredient ghost = inputs[i];
             if (ghost.isEmpty()) {
-                if (node.path().getLast() instanceof Integer) {
-                    removals.add(node.path());
+                List<Object> element = elementPath(node.path());
+                if (element != null) {
+                    removals.add(element);
                     continue;
                 }
                 int slot = i + 1;
@@ -259,14 +311,16 @@ public final class TemplateRecipe {
             obj.remove("tag");
             if (ghost.tag() != null) obj.addProperty("tag", ghost.tag().location().toString());
             else obj.addProperty("item", itemId);
+            if (node.countable()) set(copy, node.countPath(), new JsonPrimitive(Math.max(1, ghost.stack().getCount())));
         }
 
         for (int i = 0; i < this.outputs.size(); i++) {
             Node node = this.outputs.get(i);
             ItemStack stack = outputs[i];
             if (stack.isEmpty()) {
-                if (node.path().getLast() instanceof Integer) {
-                    removals.add(node.path());
+                List<Object> element = elementPath(node.path());
+                if (element != null) {
+                    removals.add(element);
                     continue;
                 }
                 return DataResult.error(() -> RemoldText.error("output_empty"));
@@ -291,19 +345,15 @@ public final class TemplateRecipe {
             }
         }
 
-        // Remove emptied list entries back to front so indices stay valid.
-        removals.sort(Comparator.comparing((List<Object> p) -> (Integer) p.getLast()).reversed());
-        for (List<Object> path : removals) {
+        List<List<Object>> ordered = new ArrayList<>(removals);
+        ordered.sort(Comparator.comparing((List<Object> p) -> (Integer) p.getLast()).reversed());
+        for (List<Object> path : ordered) {
             JsonElement parent = get(copy, path.subList(0, path.size() - 1));
             if (parent.isJsonArray()) parent.getAsJsonArray().remove((int) (Integer) path.getLast());
         }
         return DataResult.success(copy);
     }
 
-    /**
-     * A copy of this recipe with every reference to item {@code from} changed to {@code to}, or null if
-     * the recipe doesn't mention it. Tag ingredients are left alone (a tag isn't an item).
-     */
     @org.jetbrains.annotations.Nullable
     public JsonObject replaceItem(String from, String to, boolean inInputs, boolean inOutputs) {
         JsonObject copy = json.deepCopy();
@@ -331,10 +381,6 @@ public final class TemplateRecipe {
         return changed ? copy : null;
     }
 
-    /**
-     * A copy of this recipe where ingredients that ask for exactly one of {@code items} accept the
-     * whole {@code tag} instead, or null if nothing changed.
-     */
     @org.jetbrains.annotations.Nullable
     public JsonObject widenToTag(Set<String> items, String tag) {
         JsonObject copy = json.deepCopy();
@@ -350,8 +396,6 @@ public final class TemplateRecipe {
         }
         return changed ? copy : null;
     }
-
-    // ------------------------------------------------------------------ json paths
 
     static JsonElement get(JsonElement root, List<Object> path) {
         JsonElement e = root;

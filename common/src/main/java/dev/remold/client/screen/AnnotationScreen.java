@@ -24,10 +24,6 @@ import net.minecraft.world.item.ItemStack;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Item-wide tooltips: every copy of the item, everywhere, shows these lines. Also the one-click
- * "make unobtainable" (remove every recipe for the item + red tooltip) and hiding from JEI/EMI.
- */
 public class AnnotationScreen extends Screen {
     private static final int LINES = 4;
     private static final String UNOBTAINABLE = "&c&lITEM UNOBTAINABLE";
@@ -55,7 +51,6 @@ public class AnnotationScreen extends Screen {
     private net.minecraft.world.item.Item usageItem;
     private int usageCount;
 
-    /** How many recipes use the item as an ingredient (shown before "make unobtainable"). */
     private int usedIn() {
         if (usageItem != target.getItem()) {
             usageItem = target.getItem();
@@ -170,7 +165,6 @@ public class AnnotationScreen extends Screen {
         }
         g.drawString(font, RemoldText.tr("tooltip.lines"), x0, 56, 0xA0A0A0);
         if (!target.isEmpty()) {
-            // live preview
             int px = x0 + 230;
             List<Component> preview = new ArrayList<>();
             preview.add(target.getHoverName());

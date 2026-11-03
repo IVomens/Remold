@@ -22,11 +22,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
-/**
- * Change many recipes at once: replace an item everywhere, remove every recipe that uses an item,
- * or remove every recipe from a mod. Shows which recipes will change before anything happens, and
- * the whole action is one undo step.
- */
 public class BulkScreen extends Screen {
     private static final int PREVIEW_LINES = 8;
 
@@ -104,7 +99,6 @@ public class BulkScreen extends Screen {
                 }));
     }
 
-    /** What the server will (at most) change, computed from the client's copy of the recipes. */
     private void updatePreview() {
         var level = minecraft.level;
         var registries = level.registryAccess();

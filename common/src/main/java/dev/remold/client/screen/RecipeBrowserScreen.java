@@ -34,7 +34,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-/** Search all recipes (from every mod), and edit, remove or restore them. */
 public class RecipeBrowserScreen extends Screen {
     private final EditorScreen editor;
     private String query;
@@ -44,7 +43,14 @@ public class RecipeBrowserScreen extends Screen {
     private Button edit, remove, revert, undo, uses, lock;
     @Nullable private Row selected;
 
-    record Row(ResourceLocation id, @Nullable RecipeHolder<?> holder, ItemStack icon, String type, @Nullable ChangeEntry change) {}
+    record Row(ResourceLocation id, @Nullable RecipeHolder<?> holder, ItemStack icon, String type, @Nullable ChangeEntry change, String search) {
+        Row(ResourceLocation id, @Nullable RecipeHolder<?> holder, ItemStack icon, String type, @Nullable ChangeEntry change) {
+            this(id, holder, icon, type, change, (id + " " + type + " " + icon.getHoverName().getString() + " "
+                    + BuiltInRegistries.ITEM.getKey(icon.getItem())).toLowerCase(Locale.ROOT));
+        }
+    }
+
+    @Nullable private List<Row> cachedRows;
 
     public RecipeBrowserScreen(EditorScreen editor, String query) {
         super(RemoldText.tr("browser.title"));
@@ -52,12 +58,10 @@ public class RecipeBrowserScreen extends Screen {
         this.query = query;
     }
 
-    /** What the search box matches. */
     enum Mode { ALL, MAKES, USES }
 
     private Mode mode = Mode.ALL;
 
-    /** Opens the browser listing every recipe that uses {@code item} as an ingredient. */
     public static RecipeBrowserScreen usesOf(EditorScreen editor, ItemStack item) {
         RecipeBrowserScreen screen = new RecipeBrowserScreen(editor, BuiltInRegistries.ITEM.getKey(item.getItem()).toString());
         screen.mode = Mode.USES;
@@ -67,15 +71,6 @@ public class RecipeBrowserScreen extends Screen {
     @Override
     protected void init() {
         int x0 = width / 2 - 182;
-        addRenderableWidget(Button.builder(RemoldText.tr("browser.tags"), b -> minecraft.setScreen(new TagEditorScreen(this)))
-                .bounds(x0, 4, 60, 16).build()).setTooltip(Tooltip.create(RemoldText.tr("browser.tags.hint")));
-        addRenderableWidget(Button.builder(RemoldText.tr("browser.import"), b -> minecraft.setScreen(new ImportScreen(this)))
-                .bounds(x0 + 64, 4, 60, 16).build()).setTooltip(Tooltip.create(RemoldText.tr("browser.import.hint")));
-        addRenderableWidget(Button.builder(RemoldText.tr("browser.unify"), b -> minecraft.setScreen(new UnifyScreen(this)))
-                .bounds(x0 + 240, 4, 60, 16).build()).setTooltip(Tooltip.create(RemoldText.tr("browser.unify.hint")));
-        addRenderableWidget(Button.builder(RemoldText.tr("browser.bulk"), b -> minecraft.setScreen(new BulkScreen(this)))
-                .bounds(x0 + 304, 4, 60, 16).build()).setTooltip(Tooltip.create(RemoldText.tr("browser.bulk.hint")));
-
         search = new EditBox(font, x0, 24, 176, 16, RemoldText.tr("search"));
         search.setHint(RemoldText.tr("browser.search").withStyle(ChatFormatting.DARK_GRAY));
         search.setValue(query);
@@ -121,6 +116,7 @@ public class RecipeBrowserScreen extends Screen {
                 .bounds(x + step * 6, y, w, 20).build());
         apply.setTooltip(Tooltip.create(RemoldText.tr("browser.apply.hint")));
         addRenderableWidget(Button.builder(CommonComponents.GUI_BACK, b -> onClose()).bounds(x + step * 7, y, w, 20).build());
+        lastHash = currentHash();
         refresh();
         setInitialFocus(search);
     }
@@ -132,7 +128,6 @@ public class RecipeBrowserScreen extends Screen {
         rebuildWidgets();
     }
 
-    /** Items whose id or name matches the search (an exact id matches only that item). */
     private Set<Item> matchingItems(String q) {
         ResourceLocation exact = ResourceLocation.tryParse(q);
         if (exact != null && q.contains(":") && BuiltInRegistries.ITEM.containsKey(exact)) {
@@ -149,6 +144,11 @@ public class RecipeBrowserScreen extends Screen {
     }
 
     private List<Row> allRows() {
+        if (cachedRows == null) cachedRows = buildRows();
+        return cachedRows;
+    }
+
+    private List<Row> buildRows() {
         var level = minecraft.level;
         Map<ResourceLocation, ChangeEntry> changes = new HashMap<>();
         for (ChangeEntry c : ClientState.changes()) changes.put(c.id(), c);
@@ -163,7 +163,7 @@ public class RecipeBrowserScreen extends Screen {
             ResourceLocation type = BuiltInRegistries.RECIPE_TYPE.getKey(h.value().getType());
             rows.add(new Row(h.id(), h, result.isEmpty() ? new ItemStack(Items.PAPER) : result, String.valueOf(type), changes.remove(h.id())));
         }
-        // Removed recipes are no longer loaded, but must stay visible so they can be restored.
+
         for (ChangeEntry c : changes.values()) {
             rows.add(new Row(c.id(), null, new ItemStack(Items.BARRIER), c.recipeType(), c));
         }
@@ -174,20 +174,17 @@ public class RecipeBrowserScreen extends Screen {
     private void refresh() {
         String q = query.toLowerCase(Locale.ROOT).trim();
         Set<Item> items = mode != Mode.ALL && !q.isEmpty() ? matchingItems(q) : Set.of();
-        var registries = minecraft.level.registryAccess();
-        List<Row> rows = allRows().stream().filter(r -> {
+        List<Row> matches = allRows().stream().filter(r -> {
             if (changesOnly && r.change() == null) return false;
             if (q.isEmpty()) return mode == Mode.ALL;
             return switch (mode) {
-                case MAKES -> r.holder() != null && RecipeUsage.produces(r.holder().value(), items, registries);
+                case MAKES -> r.holder() != null && items.contains(r.icon().getItem());
                 case USES -> r.holder() != null && RecipeUsage.usesAny(r.holder().value(), items);
-                case ALL -> r.id().toString().contains(q) || r.type().contains(q)
-                        || r.icon().getHoverName().getString().toLowerCase(Locale.ROOT).contains(q)
-                        || BuiltInRegistries.ITEM.getKey(r.icon().getItem()).toString().contains(q);
+                case ALL -> r.search().contains(q);
             };
-        }).limit(2000).toList();
-        list.set(rows);
-        resultCount = rows.size();
+        }).toList();
+        list.set(matches.size() > 2000 ? matches.subList(0, 2000) : matches);
+        resultCount = matches.size();
         select(null);
     }
 
@@ -225,10 +222,11 @@ public class RecipeBrowserScreen extends Screen {
     public void tick() {
         super.tick();
         undo.active = ClientState.canUndo();
-        // Rows change once the server has reloaded; refresh when the data we're based on changes.
-        int hash = ClientState.changes().hashCode() ^ System.identityHashCode(minecraft.level.getRecipeManager().getRecipes());
+
+        int hash = currentHash();
         if (hash != lastHash) {
             lastHash = hash;
+            cachedRows = null;
             ResourceLocation keep = selected == null ? null : selected.id();
             refresh();
             if (keep != null) list.children().stream().filter(e -> e.row.id().equals(keep)).findFirst().ifPresent(e -> {
@@ -239,6 +237,10 @@ public class RecipeBrowserScreen extends Screen {
     }
 
     private int lastHash;
+
+    private int currentHash() {
+        return ClientState.changes().hashCode() ^ System.identityHashCode(minecraft.level.getRecipeManager().getRecipes());
+    }
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
@@ -251,9 +253,16 @@ public class RecipeBrowserScreen extends Screen {
         }
     }
 
+    @org.jetbrains.annotations.Nullable private Screen back;
+
+    public RecipeBrowserScreen backTo(Screen screen) {
+        back = screen;
+        return this;
+    }
+
     @Override
     public void onClose() {
-        minecraft.setScreen(editor);
+        minecraft.setScreen(back != null ? back : editor);
     }
 
     class RowList extends ObjectSelectionList<RowList.Entry> {

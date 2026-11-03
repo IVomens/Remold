@@ -15,7 +15,6 @@ subprojects {
     }
 
     repositories {
-        // Mod repositories first; Maven Central last.
         maven { name = 'Fabric'; url = 'https://maven.fabricmc.net/' }
         maven { name = 'Jared (JEI)'; url = 'https://maven.blamejared.com/' }
         maven { name = 'TerraformersMC (EMI)'; url = 'https://maven.terraformersmc.com/releases/' }

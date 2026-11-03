@@ -34,12 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Finds materials that several mods add (more than one item in a common tag like
- * {@code #c:ingots/copper}) and unifies them on one preferred item.
- */
 public class UnifyScreen extends Screen {
-    /** Common tag folders where every item should be the same material. */
     private static final List<String> PREFIXES = List.of("ingots/", "nuggets/", "dusts/", "gems/", "plates/", "gears/",
             "rods/", "storage_blocks/", "raw_materials/", "wires/", "sheets/", "coins/");
 
@@ -81,7 +76,6 @@ public class UnifyScreen extends Screen {
         selected = groups.keySet().stream().findFirst().orElse(null);
     }
 
-    /** Vanilla's item if there is one, otherwise the first mod's (alphabetically). */
     private static Item defaultPreferred(List<Item> members) {
         return members.stream().min(Comparator
                 .comparing((Item i) -> !BuiltInRegistries.ITEM.getKey(i).getNamespace().equals("minecraft"))
@@ -116,7 +110,6 @@ public class UnifyScreen extends Screen {
         updateEstimate();
     }
 
-    /** Recipes that make a non-preferred item, or (when widening inputs) use one. An upper bound. */
     private void updateEstimate() {
         Set<Item> others = new HashSet<>();
         for (ResourceLocation tag : included) {
@@ -138,8 +131,6 @@ public class UnifyScreen extends Screen {
         Services.PLATFORM.sendToServer(new Payloads.Unify(new UnifySettings(chosen, hide, convert, tagInputs), !hasShiftDown()));
         onClose();
     }
-
-    // ------------------------------------------------------------------ members of the selected group
 
     private int gridX() {
         return width / 2 + 5;
@@ -242,7 +233,7 @@ public class UnifyScreen extends Screen {
             public void render(GuiGraphics g, int index, int top, int left, int width, int height, int mouseX, int mouseY, boolean hovering, float partialTick) {
                 boolean on = included.contains(tag);
                 boolean done = ClientState.unify().groups().containsKey(tag);
-                // checkbox
+
                 g.fill(left + 2, top + 4, left + 12, top + 14, 0xFF000000);
                 g.renderOutline(left + 2, top + 4, 10, 10, 0xFFA0A0A0);
                 if (on) g.fill(left + 4, top + 6, left + 10, top + 12, 0xFF55FF55);
@@ -253,7 +244,6 @@ public class UnifyScreen extends Screen {
 
             @Override
             public boolean mouseClicked(double mouseX, double mouseY, int button) {
-                // the checkbox toggles; the rest selects
                 if (mouseX < getRowLeft() + 14) {
                     if (!included.remove(tag)) included.add(tag);
                     updateEstimate();

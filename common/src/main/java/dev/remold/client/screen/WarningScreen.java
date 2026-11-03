@@ -12,7 +12,6 @@ import net.minecraft.util.FormattedCharSequence;
 import java.util.ArrayList;
 import java.util.List;
 
-/** "This change may break things" with the details, and Continue anyway / Cancel. */
 public class WarningScreen extends Screen {
     private final Screen parent;
     private final List<Component> lines;
